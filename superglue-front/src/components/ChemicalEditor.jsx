@@ -9,16 +9,18 @@ import {
   CommentOutlined,
   ArrowLeftOutlined,
   SearchOutlined,
-  TableOutlined
+  TableOutlined,
+  FilterOutlined
 } from '@ant-design/icons';
 import SimilaritySearch from './SimilaritySearch';
+import SidebarFilter from './SidebarFilter';
 import '../styles/main.css';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 
-const MoleculeIndex = () => {
+const MoleculeIndex = ({ initialTab = 'annotate' }) => {
   // Get the URL parameter
   const { id } = useParams();
   const location = useLocation();
@@ -33,12 +35,11 @@ const MoleculeIndex = () => {
   const [ketcherSmiles, setKetcherSmiles] = useState('');
   const [ketcherMolfile, setKetcherMolfile] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [selectedTab, setSelectedTab] = useState('annotate');
+  const [selectedTab, setSelectedTab] = useState(initialTab);
 
- // state for similarity search
+  // State for similarity search
   const [similaritySearchVisible, setSimilaritySearchVisible] = useState(false);
   const [showResultsTable, setShowResultsTable] = useState(false);
-  // const [searchResults, setSearchResults] = useState([]);
   const [similarityResults, setSimilarityResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
@@ -46,6 +47,22 @@ const MoleculeIndex = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMethod, setSearchMethod] = useState('');
 
+  // State for filter sidebar
+  const [showFilterSidebar, setShowFilterSidebar] = useState(false);
+  const [filtersActive, setFiltersActive] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({});
+  const [enabledFilters, setEnabledFilters] = useState({
+    similarity: true,
+    binary_occ: false,
+    cont_occ: false,
+    low_gsh_prob: false,
+    med_gsh_prob: false,
+    high_gsh_prob: false,
+    selectivity: false
+  });
+
+  // Store original results for filter reset
+  const [originalResults, setOriginalResults] = useState([]);
 
   // Get dynamic molecule property from CSV
   const [moleculeProperties, setMoleculeProperties] = useState({});
@@ -175,9 +192,11 @@ const MoleculeIndex = () => {
       setKetcherSmiles(smiles);
       setCurrentSmiles(smiles); // Update current SMILES with the one from Ketcher
       message.success(`SMILES: ${smiles}`);
+      return smiles;
     } catch (error) {
       console.error('Error fetching SMILES from Ketcher:', error);
       message.error('Failed to get SMILES.');
+      return null;
     }
   };
 
@@ -221,23 +240,114 @@ const MoleculeIndex = () => {
     if (action === 'similarity') {
       // First update current SMILES from Ketcher
       getSmiles().then(() => {
+        // Reset filter sidebar state
+        setShowFilterSidebar(false);
         setSimilaritySearchVisible(true);
       });
     } else {
       setSimilaritySearchVisible(false);
       setShowResultsTable(false);
+      setShowFilterSidebar(false);
     }
   };
 
   // Handle similarity search results
   const handleSimilarityResults = (results, method) => {
+    console.log("Received search results:", results);
+
     setSimilarityResults(results);
+    setOriginalResults(results); // Store original results for filter reset
     setShowResultsTable(true);
     setSearchMethod(method);
+    setFiltersActive(false);
+    setActiveFilters({});
+
+    // Extract actual min/max for each property and prepare ranges for filter initialization
+    const ranges = {};
+    const propertiesToCheck = ['similarity', 'binary_occ', 'cont_occ', 'low_gsh_prob', 'med_gsh_prob', 'high_gsh_prob', 'selectivity'];
+
+    propertiesToCheck.forEach(prop => {
+      const values = results
+        .map(result => result[prop])
+        .filter(val => val !== undefined && val !== null && !isNaN(val));
+
+      if (values.length > 0) {
+        // Calculate actual min and max
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+
+        // Add small buffer to max value (5% of range) to ensure values at max are included
+        const buffer = (max - min) * 0.05;
+        const adjustedMax = max + buffer;
+
+        // Store the range
+        ranges[prop] = [min, adjustedMax];
+        console.log(`Property ${prop} range: [${min}, ${adjustedMax}]`);
+      }
+    });
+
+    // Update enabledFilters state if needed
+    // setEnabledFilters(...) - could be updated here if needed
 
     getSmiles().then(smiles => {
-    setSearchQuery(smiles || currentSmiles);
-  });
+      setSearchQuery(smiles || currentSmiles);
+    });
+  };
+
+  // Handle filter application
+  const handleApplyFilters = (filters) => {
+    setIsSearching(true);
+    setActiveFilters(filters);
+    setFiltersActive(true);
+
+    try {
+      // Get the enabled filters
+      const enabledFilterKeys = Object.keys(filters);
+
+      // Update enabled filters state
+      const newEnabledFilters = {};
+      Object.keys(enabledFilters).forEach(key => {
+        newEnabledFilters[key] = enabledFilterKeys.includes(key);
+      });
+      setEnabledFilters(newEnabledFilters);
+
+      // Apply filters to the original results
+      const filteredResults = originalResults.filter(result => {
+        // Check each enabled filter
+        return enabledFilterKeys.every(property => {
+          const value = result[property];
+          const range = filters[property];
+          return value >= range[0] && value <= range[1];
+        });
+      });
+
+      // Update the results table
+      setSimilarityResults(filteredResults);
+      message.success(`Applied filters: Found ${filteredResults.length} results`);
+    } catch (error) {
+      console.error('Error applying filters:', error);
+      message.error('Failed to apply filters');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle clearing filters
+  const handleClearFilters = () => {
+    setFiltersActive(false);
+    setActiveFilters({});
+    setEnabledFilters({
+      similarity: true,
+      binary_occ: false,
+      cont_occ: false,
+      low_gsh_prob: false,
+      med_gsh_prob: false,
+      high_gsh_prob: false,
+      selectivity: false
+    });
+    // Restore original search results
+    setSimilarityResults(originalResults);
+    message.info('Filters cleared');
   };
 
   // Format property values
@@ -279,84 +389,136 @@ const MoleculeIndex = () => {
     return {};
   };
 
-  // Results table columns
-  const resultColumns = [
+  // Results table columns with highlight for filtered columns
+  const resultColumns = () => {
+    const columns = [
+      {
+      title: 'Cmpd Id',
+      dataIndex: 'cmpd_id',
+      key: 'cmpd_id',
+    },
     {
-    title: 'Cmpd Id',
-    dataIndex: 'cmpd_id',
-    key: 'cmpd_id',
-  },
-  {
-    title: 'Similarity',
-    dataIndex: 'similarity',
-    key: 'similarity',
-    sorter: (a, b) => a.similarity - b.similarity,
-    render: value => (value * 100).toFixed(1) + '%',
-    defaultSortOrder: 'descend',
-  },
-
-  {
-    title: 'Binary Occ',
-    dataIndex: 'binary_occ',
-    key: 'binary_occ',
-    sorter: (a, b) => a.binary_occ - b.binary_occ,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'Cont Occ',
-    dataIndex: 'cont_occ',
-    key: 'cont_occ',
-    sorter: (a, b) => a.cont_occ - b.cont_occ,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'Low Gsh Prob',
-    dataIndex: 'low_gsh_prob',
-    key: 'low_gsh_prob',
-    sorter: (a, b) => a.low_gsh_prob - b.low_gsh_prob,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'Med Gsh Prob',
-    dataIndex: 'med_gsh_prob',
-    key: 'med_gsh_prob',
-    sorter: (a, b) => a.med_gsh_prob - b.med_gsh_prob,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'High Gsh Prob',
-    dataIndex: 'high_gsh_prob',
-    key: 'high_gsh_prob',
-    sorter: (a, b) => a.high_gsh_prob - b.high_gsh_prob,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'Selectivity',
-    dataIndex: 'selectivity',
-    key: 'selectivity',
-    sorter: (a, b) => a.selectivity - b.selectivity,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'Actions',
-    key: 'actions',
-    render: (_, record) => (
-      <Space>
-        <Button size="small" onClick={() => {
-          if (ketcher) {
-            try {
-              ketcher.setMolecule(record.smiles);
-            } catch (error) {
-              console.error('Error loading molecule:', error);
+      title: (
+        <span>
+          Similarity
+          {filtersActive && activeFilters.similarity && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
+      dataIndex: 'similarity',
+      key: 'similarity',
+      sorter: (a, b) => a.similarity - b.similarity,
+      render: value => (value * 100).toFixed(1) + '%',
+      defaultSortOrder: 'descend',
+    },
+    {
+      title: (
+        <span>
+          Binary Occ
+          {filtersActive && activeFilters.binary_occ && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
+      dataIndex: 'binary_occ',
+      key: 'binary_occ',
+      sorter: (a, b) => a.binary_occ - b.binary_occ,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: (
+        <span>
+          Cont Occ
+          {filtersActive && activeFilters.cont_occ && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
+      dataIndex: 'cont_occ',
+      key: 'cont_occ',
+      sorter: (a, b) => a.cont_occ - b.cont_occ,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: (
+        <span>
+          Low Gsh Prob
+          {filtersActive && activeFilters.low_gsh_prob && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
+      dataIndex: 'low_gsh_prob',
+      key: 'low_gsh_prob',
+      sorter: (a, b) => a.low_gsh_prob - b.low_gsh_prob,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: (
+        <span>
+          Med Gsh Prob
+          {filtersActive && activeFilters.med_gsh_prob && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
+      dataIndex: 'med_gsh_prob',
+      key: 'med_gsh_prob',
+      sorter: (a, b) => a.med_gsh_prob - b.med_gsh_prob,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: (
+        <span>
+          High Gsh Prob
+          {filtersActive && activeFilters.high_gsh_prob && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
+      dataIndex: 'high_gsh_prob',
+      key: 'high_gsh_prob',
+      sorter: (a, b) => a.high_gsh_prob - b.high_gsh_prob,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: (
+        <span>
+          Selectivity
+          {filtersActive && activeFilters.selectivity && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
+      dataIndex: 'selectivity',
+      key: 'selectivity',
+      sorter: (a, b) => a.selectivity - b.selectivity,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button size="small" onClick={() => {
+            if (ketcher) {
+              try {
+                ketcher.setMolecule(record.smiles);
+              } catch (error) {
+                console.error('Error loading molecule:', error);
+              }
             }
-          }
-        }}>
-          View
-        </Button>
-      </Space>
-    ),
-  },
-];
+          }}>
+            View
+          </Button>
+        </Space>
+      ),
+    }
+    ];
+
+    return columns;
+  };
 
   const ketcherPath = window.location.origin + '/standalone/index.html';
 
@@ -404,9 +566,24 @@ const MoleculeIndex = () => {
           <div>
             <Text strong>Current Mode: </Text>
             <Text>{selectedTab.charAt(0).toUpperCase() + selectedTab.slice(1)}</Text>
+            {filtersActive && (
+              <Text type="secondary" style={{ marginLeft: '10px' }}>
+                (Filters Applied: {Object.keys(activeFilters).filter(key => enabledFilters?.[key]).length})
+              </Text>
+            )}
           </div>
+
           {showResultsTable && selectedTab === 'similarity' && (
             <div>
+              <Button
+                type={showFilterSidebar ? 'primary' : 'default'}
+                icon={<FilterOutlined />}
+                style={{ marginRight: '8px' }}
+                onClick={() => setShowFilterSidebar(!showFilterSidebar)}
+              >
+                {showFilterSidebar ? 'Hide Filters' : 'Show Filters'}
+              </Button>
+
               <Button
                 type="primary"
                 icon={<TableOutlined />}
@@ -416,6 +593,7 @@ const MoleculeIndex = () => {
               </Button>
             </div>
           )}
+
           <div>
             <Text strong>Molecule: </Text>
             <Text>{moleculeName}</Text>
@@ -425,6 +603,28 @@ const MoleculeIndex = () => {
         <Layout style={{ padding: '24px' }}>
           {/* Main content layout with conditional height based on results visibility */}
           <Layout>
+            {/* Filter sidebar (conditionally rendered) */}
+            {showFilterSidebar && (
+              <Sider
+                width={280}
+                style={{
+                  background: '#fff',
+                  marginRight: '16px',
+                  borderRadius: '4px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                }}
+              >
+                <SidebarFilter
+                  isVisible={true}
+                  searchResults={similarityResults}
+                  onApplyFilters={handleApplyFilters}
+                  onClearFilters={handleClearFilters}
+                  currentSmiles={currentSmiles}
+                  isLoading={isSearching}
+                />
+              </Sider>
+            )}
+
             {/* Ketcher editor area */}
             <Content
               style={{
@@ -447,20 +647,39 @@ const MoleculeIndex = () => {
             {/* Similarity Results Table (conditionally rendered) */}
             {showResultsTable && (
               <Content style={{ background: '#fff', padding: '12px', width: '100%', marginBottom: '16px' }}>
-                <div style={{ marginBottom: '12px' }}>
-                  <div style={{ marginBottom: '8px' }}>
-                    <Text strong>Query Smiles: </Text>
-                    <Text>{searchQuery}</Text>
+                <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <Text strong>Query Smiles: </Text>
+                      <Text>{searchQuery ? (searchQuery.length > 30 ? searchQuery.substring(0, 30) + '...' : searchQuery) : ''}</Text>
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <Text strong>Similarity Metric: </Text>
+                      <Text>{searchMethod.charAt(0).toUpperCase() + searchMethod.slice(1)}</Text>
+                      {filtersActive && (
+                        <Text type="secondary" style={{ marginLeft: '10px' }}>
+                          (Filters Applied)
+                        </Text>
+                      )}
+                    </div>
+                    <Text strong>Search Results: </Text>
+                    <Text>{similarityResults.length} compounds</Text>
                   </div>
-                  <div style={{ marginBottom: '8px' }}>
-                    <Text strong>Similarity Metric: </Text>
-                    <Text>{searchMethod.charAt(0).toUpperCase() + searchMethod.slice(1)}</Text>
+
+                  <div>
+                    <Button
+                      icon={<FilterOutlined />}
+                      onClick={() => setShowFilterSidebar(!showFilterSidebar)}
+                      type={showFilterSidebar ? 'primary' : 'default'}
+                      style={{ marginRight: '8px' }}
+                    >
+                      {showFilterSidebar ? 'Hide Filters' : 'Show Filters'}
+                    </Button>
                   </div>
-                  <Text strong>Search Results</Text>
                 </div>
 
                 <Table
-                  columns={resultColumns}
+                  columns={resultColumns()}
                   dataSource={similarityResults}
                   size="small"
                   pagination={{
@@ -472,7 +691,6 @@ const MoleculeIndex = () => {
                 />
               </Content>
             )}
-
           </Layout>
 
           {/* Right sidebar with properties */}
@@ -598,6 +816,8 @@ const MoleculeIndex = () => {
                 )}
               </Card>
             )}
+
+            {/* Filter information card is removed since there's no filter tab now */}
           </Sider>
         </Layout>
       </Layout>
