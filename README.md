@@ -1,5 +1,5 @@
 # Super Glue
-![SuperGlue Logo](gorilla_glue.jpg)
+![SuperGlue Logo](docs/gorilla_glue.jpg)
 
 SuperGlue is a web-based tool for molecular annotation and similarity search. Users can upload chemical compound datasets, visualize molecular structures, and perform similarity searches to analyze relationships between compounds.
 
