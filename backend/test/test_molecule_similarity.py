@@ -8,7 +8,7 @@ import sys
 # Assuming the module is named similarity_search.py
 # First, set up path - adjust this to match your project structure
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from backend.molecule_similarity import similarity_search, compute_similarity
+from ..backend.molecule_similarity import similarity_search, compute_similarity
 
 
 class TestSimilaritySearch(unittest.TestCase):
