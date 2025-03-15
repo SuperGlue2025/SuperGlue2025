@@ -35,19 +35,33 @@ cd backend
 #### **(2) Set Up a Virtual Environment (Recommended)**
 ```
 python -m venv venv
-source venv/bin/activate  # (Windows: venv\Scripts\activate)
 ```
-#### **(3) Install Dependencies**
+#### **(3) Activate the Virtual Environment**
+- **For Windows (PowerShell):**
+    ```
+    .\venv\Scripts\activate
+    ```
+    ⚠ **If you get a "running scripts is disabled" error**, run:
+    ```
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+    ```
+    Then, try activating the environment again.
+- **For macOS/Linux:**
+    ```
+    source venv/bin/activate
+    ```
+#### **(4) Install Dependencies**
 ```
 pip install -r requirements.txt
 ```
-#### **(4) Start the Backend Server**
+#### **(5) Start the Backend Server**
 ```
 python app.py
 ```
-
+If everything is working properly, the terminal will display information similar to the following:
+![backend](docs/backend_result.png)
 ### **3. Set Up Frontend**
-#### (1) Ensure Node.js and npm are Installed
+#### **(1) Ensure Node.js and npm are Installed**
 Check if Node.js and npm are installed:
 ```
 node -v
@@ -56,14 +70,14 @@ npm -v
 If both commands display version numbers, Node.js is installed.
 Otherwise, download it from the [Node.js official website](https://nodejs.org/en).
 
-#### (2) Navigate to the Frontend Folder & Install Dependencies
+#### **(2) Navigate to the Frontend Folder & Install Dependencies**
 ```
-cd ../frontend
+cd ../superglue-front
 npm install
 ```
 This command will install all required dependencies from `package.json`.
 
-#### (3) Start the Development Server
+#### **(3) Start the Development Server**
 ```
 npm run dev
 ```
