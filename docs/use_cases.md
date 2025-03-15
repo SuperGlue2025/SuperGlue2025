@@ -1,72 +1,134 @@
-### Visualize molecules
-input(s): molecule name or chemical formula
+# Use Cases
 
-output(s): list of skeletal structures of input/similar structures
-### Interactive molecular modeling
-input(s): Using Ketcher can create 2-d molecular structures (or add to existing ones)
+## 1. Visualizing Molecules
+🟡 **■ User Action:** Input a molecule name, SMILES string, or chemical formula.  
+🔵 **▲ Expected Outcome:** The system displays a **2D skeletal structure** of the input molecule along with its properties.  
 
-output(s): molecular structure that can be saved and annotated
-### Highlight molecules
-input(s): drag cursor over section(s) of molecular structure
+---
 
-output(s): section is highlighted in yellow (color selection?)
-### Text-based annotation
-input(s): click on highlighted section and write notes in a text box/text window
+## 2. Interactive Molecular Modeling
+🟡 **■ User Action:** Draw a molecule or edit an existing structure using Ketcher.  
+🔵 **▲ Expected Outcome:** The user-created molecular structure is saved and can be annotated or modified later.  
 
-output(s): annotations that can be saved/edited/exported later on
-### Save work
-input(s): automatic save or a save button?
+---
 
-output(s): work is saved on the site and can be accessed at a later time
-### Preprocess data
-input(s): Upload file containing user’s tabulated data on their molecules
+## 3. Highlighting Molecular Structures
+🟡 **■ User Action:** Click and drag the cursor over a molecular structure to highlight specific functional groups or substructures.  
+🔵 **▲ Expected Outcome:** The selected sections are **visually marked** and saved for annotation.  
 
-output(s): Data is organized using machine learning algorithms to allow for convenient analysis
-### Similarity search
-input(s): molecule name, chemical formula, created molecular structure
+---
 
-output(s): list of molecules with similar structures and/or properties
-### Obtain molecular properties
-input(s): molecule name, chemical formula, created molecular structure
+## 4. Text-Based Annotation
+🟡 **■ User Action:** Click on a highlighted section and enter notes in a text box.  
+🔵 **▲ Expected Outcome:** The text annotation is saved and linked to the highlighted molecular region. The user can edit or export these annotations later.  
 
-output(s): list of physical, chemical properties 
-### Compatible with prebuilt workflows
-input(s): molecular dataset, workflow integration settings
+---
 
-output(s): compatibility with existing cheminformatics pipelines, automated workflow execution
-### Import/export/save files
-input(s): click a button of said option
+## 5. Saving Work
+🟡 **■ User Action:** Click the "Save" button or allow **automatic saving** at set intervals.  
+🔵 **▲ Expected Outcome:**  
+✅ Annotations and modifications are saved locally or in the database.  
+✅ Users can manually save and name different versions of their work.  
+✅ Undo/redo features allow reverting to previous versions.  
 
-output(s): computer filing system window pops up and you can select files to import or export/save your current work
-### Automated data clearing
-input(s): Raw molecular datasets
+---
 
-output(s): Duplicates removed, missing values handles, data structured for analysis
-### Feature engineering
-input(s): Molecular datasets, user selected features
+## 6. Preprocessing Data
+🟡 **■ User Action:** Upload a CSV file containing molecular data.  
+🔵 **▲ Expected Outcome:**  
+✅ Data is parsed into structured molecular properties.  
+✅ Duplicates are removed, missing values handled, and data formatted for analysis.  
+❌ If the file format is invalid, the system displays an error message and suggests corrections.  
 
-output(s): Engineered features for machine learning models
-### Submit annotations as structured graph data to backend that is automatically written to disk
-input(s): User annotations, molecular structure relationships
+---
 
-output(s): Graph-based annotation storage, backend integration for structured analysis
-### Page through lists of molecular structures
-input(s): Scroll or drag controls
+## 7. Similarity Search
+🟡 **■ User Action:** Input a molecule (by name, SMILES, or drawn structure) to find structurally similar compounds.  
+🔵 **▲ Expected Outcome:**  
+✅ The system calculates **structural similarity using molecular fingerprints**.  
+✅ A **ranked list of similar compounds** is displayed, including similarity scores.  
+✅ Users can filter results based on **threshold values** (e.g., solubility, toxicity).  
 
-output(s): Display of molecular structures with navigation through pages
-### Read molecule data through backend
-input(s): API request, database query
+---
 
-output(s): Retrieved molecular data from backend for display
-### Machine learning integration
-input(s): Dataset, molecular features, trained models
+## 8. Obtaining Molecular Properties
+🟡 **■ User Action:** Input a molecule name, chemical formula, or structure.  
+🔵 **▲ Expected Outcome:**  
+✅ The system retrieves a **list of physical and chemical properties**.  
+✅ Users can view **predicted values alongside experimental data**.  
 
-output(s): ML model predictions, dataset export
-### User register/login
-input(s): user signs up with an email address and chooses a password
+---
 
-output(s): user is entered into system and can login and continue previous work
-### Flag deviations between molecule and inputted specifications
-input(s): molecule, specifications
+## 9. Compatibility with Prebuilt Workflows
+🟡 **■ User Action:** Upload molecular datasets and configure workflow integration settings.  
+🔵 **▲ Expected Outcome:** The dataset integrates with **existing cheminformatics pipelines**, enabling **automated workflow execution**.  
 
-output(s): molecular properties are combed through and those that aren’t within the threshold of the specifications are flagged (maybe listed or highlighted in the data table)
+---
+
+## 10. Importing, Exporting, and Saving Files
+🟡 **■ User Action:** Click the **import/export** button and select a file from the computer.  
+🔵 **▲ Expected Outcome:** The system allows the user to:  
+✅ **Import** molecular datasets.  
+✅ **Export** annotated molecules in **CSV, JSON, or SDF formats**.  
+✅ **Save** session data for later access.  
+
+---
+
+## 11. Automated Data Cleaning
+🟡 **■ User Action:** Upload a raw molecular dataset.  
+🔵 **▲ Expected Outcome:**  
+✅ The system **removes duplicates**, **handles missing values**, and **formats data** for easier analysis.  
+✅ A summary of **cleaned data** is displayed.  
+
+---
+
+## 12. Feature Engineering for Machine Learning
+🟡 **■ User Action:** Select dataset features to be engineered for ML models.  
+🔵 **▲ Expected Outcome:** The system generates engineered features **based on molecular properties**, ready for training predictive models.  
+
+---
+
+## 13. Submitting Annotations as Structured Graph Data
+🟡 **■ User Action:** Annotate molecular structures with **highlights and text notes**.  
+🔵 **▲ Expected Outcome:**  
+✅ The annotations are **stored as structured graph data**.  
+✅ Relationships between molecules and annotations are maintained in the backend for structured analysis.  
+
+---
+
+## 14. Navigating Through Molecular Lists
+🟡 **■ User Action:** Scroll or use navigation buttons to browse molecular structures.  
+🔵 **▲ Expected Outcome:** The system allows **paging through large datasets**, displaying molecular properties dynamically.  
+
+---
+
+## 15. Retrieving Molecule Data from Backend
+🟡 **■ User Action:** Request molecular data from the backend via an API query.  
+🔵 **▲ Expected Outcome:** The system retrieves and displays relevant molecular structures, properties, and annotations.  
+
+---
+
+## 16. Machine Learning Integration
+🟡 **■ User Action:** Submit a molecular dataset and select an ML model for prediction.  
+🔵 **▲ Expected Outcome:**  
+✅ The ML model generates **predictions for properties like ADMET, solubility, and toxicity risks**.  
+✅ Users can export results for further analysis.  
+✅ Adjustable **confidence thresholds** allow fine-tuning predictions.  
+
+---
+
+## 17. User Registration & Login
+🟡 **■ User Action:** Sign up using an email address and password.  
+🔵 **▲ Expected Outcome:**  
+✅ Users create an account and log in securely.  
+✅ Previous work is saved and accessible in future sessions.  
+
+---
+
+## 18. Flagging Deviations from Specifications
+🟡 **■ User Action:** Compare a molecule’s properties against predefined specifications.  
+🔵 **▲ Expected Outcome:**  
+✅ Properties **outside of set thresholds** are **highlighted or flagged**.  
+✅ A detailed report of deviations is generated for further review.  
+
+---
