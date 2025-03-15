@@ -46,4 +46,4 @@ SuperGlue is a web-based tool for molecular annotation and similarity search. Us
 - Dr. David Beck - Capstone professor, offering insights and software engineering advice.
 
 ## License
-A license is needing to be added.
+This project is licensed under the MIT License.
