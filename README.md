@@ -23,10 +23,20 @@ SuperGlue is a web-based tool for molecular annotation and similarity search. Us
 
 ## Installation
 ### **1. Clone the Repository**
+#### (1) Find the repo url: https://github.com/SuperGlue2025/SuperGlue2025.git
+#### (2) Run the following command in your terminal: `git clone https://github.com/SuperGlue2025/SuperGlue2025.git`
+#### 
 ### **2. Set Up Backend**
+#### 
 ### **3. Start Backend**
+#### (1) Run the command in terminal: `cd backend`
+#### (2) Then run the command `python app.py`<br> If everything is working properly, the terminal will display information similar to the following:<br> 
+![backend](docs/backend_result.png)
 ### **4. Set Up Frontend**
-
+#### (1) Make sure Node.js and npm are installed on your computer.<br> If not yet installed, you can download and install them from the [Node.js official website](https://nodejs.org/en).<br> Check Node.js and npm versions, run: `node -v` and `npm -v`. <br> If both commands display version numbers, the installation was successful.
+#### (2) Install Project Dependencies. <br> In the terminal (Terminal / CMD / PowerShell), navigate to the project directory: `cd superglue-front`<br> Then run: `npm install` This command will install all dependencies listed in the package.json file.
+#### (3) Run the Development Environment.<br> After installation is complete, run: `npm run dev`<br> If everything is working properly, the terminal will display information similar to the following:<br>
+![frontend](docs/frontend_result.png)
 ## Usage
 1. **Upload a CSV file** with compound IDs and SMILES.
 2. **Navigate the dataset** using the summary page.
