@@ -1,7 +1,7 @@
 # file_upload.py
 from flask import request, jsonify
 import os
-from molecule_annotate import service  # Import the service instance
+# from molecule_annotate import service  # Import the service instance
 
 # Configure the directory for storing uploaded files
 UPLOAD_FOLDER = 'data/'
