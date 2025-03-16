@@ -36,7 +36,7 @@ def mock_upload_file():
 
 
 # Now import the UPLOAD_FOLDER only
-from backend.file_upload import UPLOAD_FOLDER
+from file_upload import UPLOAD_FOLDER
 
 
 class TestFileUpload(unittest.TestCase):
