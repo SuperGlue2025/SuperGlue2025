@@ -1,0 +1,15 @@
+name: superglue
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - flask=3.1.0
+  - flask-cors=5.0.0
+  - pandas=2.2.3
+  - numpy=2.1.3
+  - rdkit=2024.9.5
+  - pip
+  - pip:
+      - flask
+      - flask-cors

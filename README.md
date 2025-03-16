@@ -1,5 +1,5 @@
 # Super Glue
-![SuperGlue Logo](gorilla_glue.jpg)
+![SuperGlue Logo](docs/gorilla_glue.jpg)
 
 SuperGlue is a web-based tool for molecular annotation and similarity search. Users can upload chemical compound datasets, visualize molecular structures, and perform similarity searches to analyze relationships between compounds.
 
@@ -23,9 +23,66 @@ SuperGlue is a web-based tool for molecular annotation and similarity search. Us
 
 ## Installation
 ### **1. Clone the Repository**
+```
+git clone https://github.com/SuperGlue2025/SuperGlue2025.git
+cd SuperGlue
+```
 ### **2. Set Up Backend**
-### **3. Start Backend**
-### **4. Set Up Frontend**
+#### **(1) Navigate to the Backend Folder**
+```
+cd backend
+```
+#### **(2) Set Up a Virtual Environment (Recommended)**
+```
+python -m venv venv
+```
+#### **(3) Activate the Virtual Environment**
+- **For Windows (PowerShell):**
+    ```
+    .\venv\Scripts\activate
+    ```
+    ⚠ **If you get a "running scripts is disabled" error**, run:
+    ```
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+    ```
+    Then, try activating the environment again.
+- **For macOS/Linux:**
+    ```
+    source venv/bin/activate
+    ```
+#### **(4) Install Dependencies**
+```
+pip install -r requirements.txt
+```
+#### **(5) Start the Backend Server**
+```
+python app.py
+```
+If everything is working properly, the terminal will display information similar to the following:
+![backend](docs/backend_result.png)
+### **3. Set Up Frontend**
+#### **(1) Ensure Node.js and npm are Installed**
+Check if Node.js and npm are installed:
+```
+node -v
+npm -v
+```
+If both commands display version numbers, Node.js is installed.
+Otherwise, download it from the [Node.js official website](https://nodejs.org/en).
+
+#### **(2) Navigate to the Frontend Folder & Install Dependencies**
+```
+cd ../superglue-front
+npm install
+```
+This command will install all required dependencies from `package.json`.
+
+#### **(3) Start the Development Server**
+```
+npm run dev
+```
+If everything is working properly, the terminal will display information similar to the following:
+![frontend](docs/frontend_result.png)
 
 ## Usage
 1. **Upload a CSV file** with compound IDs and SMILES.
@@ -46,4 +103,4 @@ SuperGlue is a web-based tool for molecular annotation and similarity search. Us
 - Dr. David Beck - Capstone professor, offering insights and software engineering advice.
 
 ## License
-A license is needing to be added.
+This project is licensed under the MIT License.
