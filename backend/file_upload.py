@@ -26,13 +26,13 @@ def upload_file():
         try:
             # Save the file
             file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-            print(f"Saving file to: {file_path}")  # 记录保存路径
+            print(f"Saving file to: {file_path}")
             file.save(file_path)
 
             # Load compound data
             compounds = service.load_compounds(file_path)
-            print(f"Compounds loaded: {compounds}")  # 记录加载情况
-            print(f"Dataframe empty: {service.compounds_df.empty}")  # 记录 DataFrame 状态
+            print(f"Compounds loaded: {compounds}")
+            print(f"Dataframe empty: {service.compounds_df.empty}")
 
             if compounds is not None and not service.compounds_df.empty:
                 print("File uploaded and compounds loaded successfully")
@@ -44,5 +44,5 @@ def upload_file():
                 print("Error loading compounds from file")
                 return jsonify({'error': 'Error loading compounds from file'}), 500
         except Exception as e:
-            print(f"Error processing file: {str(e)}")  # 记录异常
+            print(f"Error processing file: {str(e)}")
             return jsonify({'error': f'Error processing file: {str(e)}'}), 500
