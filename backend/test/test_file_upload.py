@@ -5,6 +5,7 @@ import pandas as pd
 from flask import Flask
 import sys
 import io
+from backend.utils import handle_file_validation
 
 # Add the project root to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -17,17 +18,9 @@ def mock_upload_file():
     """A completely mocked version of the upload_file function"""
     from flask import request, jsonify
 
-    print("Received file upload request")
-    if 'file' not in request.files:
-        print("No file part in request")
-        return jsonify({'error': 'No file part'}), 400
-
-    file = request.files['file']
-    print(f"Uploaded filename: {file.filename}")
-
-    if file.filename == '':
-        print("No file selected")
-        return jsonify({'error': 'No selected file'}), 400
+    file, error = handle_file_validation(request)
+    if error:
+        return error
 
     return jsonify({
         'message': 'File uploaded and compounds loaded successfully',

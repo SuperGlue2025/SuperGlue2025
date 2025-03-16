@@ -1,8 +1,8 @@
 import unittest
 import os
-import pandas as pd
-from unittest.mock import patch, mock_open, MagicMock
 import sys
+import pandas as pd
+from unittest.mock import patch
 
 # Import the module to test
 # Assuming the module is named similarity_search.py
