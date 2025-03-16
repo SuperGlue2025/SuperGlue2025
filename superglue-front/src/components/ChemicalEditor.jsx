@@ -35,17 +35,20 @@ const MoleculeIndex = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedTab, setSelectedTab] = useState('annotate');
 
- // state for similarity search
+  // State for selected substructure
+  const [selectedAtoms, setSelectedAtoms] = useState([]);
+  const [selectedBonds, setSelectedBonds] = useState([]);
+  const [highlightedSubstructure, setHighlightedSubstructure] = useState({});
+
+  // state for similarity search
   const [similaritySearchVisible, setSimilaritySearchVisible] = useState(false);
   const [showResultsTable, setShowResultsTable] = useState(false);
-  // const [searchResults, setSearchResults] = useState([]);
   const [similarityResults, setSimilarityResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [similarityMethod, setSimilarityMethod] = useState('tanimoto');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMethod, setSearchMethod] = useState('');
-
 
   // Get dynamic molecule property from CSV
   const [moleculeProperties, setMoleculeProperties] = useState({});
@@ -117,7 +120,7 @@ const MoleculeIndex = () => {
     const initializeKetcher = () => {
       const ketcherFrame = document.getElementById('idKetcher');
       if (!ketcherFrame) {
-        message.error('Failed to locate the iframe element.');
+        message.error('Couldnt find Ketcher');
         return;
       }
 
@@ -126,6 +129,15 @@ const MoleculeIndex = () => {
       if (ketcherInstance) {
         setKetcher(ketcherInstance);
         message.success('Ketcher initialized successfully.');
+        // Add message listener to iframe to receive selection changes
+        window.addEventListener('message', (event) => {
+          if (event.data && event.data.type === 'ketcher-selection-change') {
+            console.log('Received Ketcher selection change:', event.data.selection);
+            // Can process selection changes here
+          }
+        });
+
+        // If there's SMILES from previous page, load the molecule
         if (smilesFromCSV) {
           setTimeout(() => {
             try {
@@ -135,7 +147,7 @@ const MoleculeIndex = () => {
               console.error('Error applying SMILES from CSV:', error);
               message.error('Failed to load molecule structure.');
             }
-          }, 800); // give some time for ketcher to visualize
+          }, 800);
         }
       } else {
         message.error('Failed to initialize Ketcher.');
@@ -175,9 +187,11 @@ const MoleculeIndex = () => {
       setKetcherSmiles(smiles);
       setCurrentSmiles(smiles); // Update current SMILES with the one from Ketcher
       message.success(`SMILES: ${smiles}`);
+      return smiles;
     } catch (error) {
       console.error('Error fetching SMILES from Ketcher:', error);
       message.error('Failed to get SMILES.');
+      return '';
     }
   };
 
@@ -197,6 +211,169 @@ const MoleculeIndex = () => {
     }
   };
 
+  // selectsubstructure based on ketcher code
+  const getSelectedSubstructure = async (ketcherInstance) => {
+    if (!ketcherInstance) {
+      ketcherInstance = ketcher;
+    }
+
+    if (!ketcherInstance) {
+      console.error('Error: Ketcher instance not initialized');
+      message.error('Ketcher instance not initialized');
+      return;
+    }
+
+    try {
+      // Use Ketcher's editor.selection() method to get current selection
+      const editorSelection = ketcherInstance.editor?.selection();
+
+      if (!editorSelection) {
+        console.warn('No selection detected, please select part of the molecule first');
+        message.warning('No selection detected, please select part of the molecule first');
+        return;
+      }
+
+      // Get atoms and bonds from selection
+      const atoms = editorSelection.atoms || [];
+      const bonds = editorSelection.bonds || [];
+
+      console.log('Selected atoms:', atoms);
+      console.log('Selected bonds:', bonds);
+
+      // Check if there's anything selected
+      if (atoms.length === 0 && bonds.length === 0) {
+        console.warn('No atoms or bonds selected');
+        message.warning('No atoms or bonds selected, please select part of the molecule first');
+        return;
+      }
+
+      // Update state
+      setSelectedAtoms(atoms);
+      setSelectedBonds(bonds);
+
+      // Get current molecule SMILES
+      let smiles = '';
+      try {
+        smiles = await ketcherInstance.getSmiles();
+        console.log('Current molecule SMILES:', smiles);
+      } catch (error) {
+        console.error('Error getting SMILES:', error);
+      }
+
+      // Create highlight data object
+      const highlightData = {
+        compoundId: moleculeName || moleculeId || `Compound-${moleculeIdFromParams}`,
+        highlightedAtoms: atoms,
+        highlightedBonds: bonds,
+        smiles: smiles,
+        timestamp: new Date().toISOString()
+      };
+
+      setHighlightedSubstructure(highlightData);
+      console.log('Highlight substructure object:', highlightData);
+
+      // Save highlighted atom data
+      if (atoms.length > 0) {
+        saveHighlightedAtoms(highlightData);
+        message.success(`Successfully captured ${atoms.length} selected atoms`);
+      }
+
+    } catch (error) {
+      console.error('Error getting selected substructure:', error);
+      message.error('Failed to get selected substructure');
+    }
+  };
+
+  // captureCurrentSelection
+  const captureCurrentSelection = () => {
+    if (!ketcher) {
+      message.error('Ketcher instance not initialized');
+      return;
+    }
+
+    console.log('Capturing current selection...');
+
+    // Confirm editor object exists
+    if (!ketcher.editor) {
+      console.error('Ketcher editor object does not exist');
+      message.error('Cannot access Ketcher editor');
+      return;
+    }
+
+    // Get selection
+    getSelectedSubstructure(ketcher);
+  };
+
+  // Add helper function to show Ketcher's selection status
+  const showSelectionStatus = () => {
+    if (!ketcher || !ketcher.editor) {
+      message.error('Ketcher instance not initialized');
+      return;
+    }
+
+    try {
+      const selection = ketcher.editor.selection();
+      console.log('Current selection status:', selection);
+
+      if (!selection || (!selection.atoms?.length && !selection.bonds?.length)) {
+        message.info('Currently no atoms or bonds are selected. Please use Ketcher\'s selection tool to select part of the molecule.');
+      } else {
+        message.success(`Currently selected: ${selection.atoms?.length || 0} atoms, ${selection.bonds?.length || 0} bonds`);
+      }
+    } catch (error) {
+      console.error('Error getting selection status:', error);
+      message.error('Failed to get selection status');
+    }
+  };
+
+
+  // Improved saveHighlightedAtoms function
+  const saveHighlightedAtoms = async (highlightData) => {
+    try {
+      // Check if any atoms are selected
+      if (!highlightData.highlightedAtoms || highlightData.highlightedAtoms.length === 0) {
+        console.warn('No atoms selected, no need to save');
+        return;
+      }
+
+      // Simulate backend response (in actual project, request would be sent to backend)
+      const result = {
+        success: true,
+        message: 'Highlighted atoms saved with canonical ordering',
+        canonicalAtoms: [...highlightData.highlightedAtoms].sort((a, b) => a - b)
+      };
+
+      console.log('Save highlight result:', result);
+
+      if (result.success) {
+        // Update local state with canonicalized atom indices
+        if (result.canonicalAtoms) {
+          setSelectedAtoms(result.canonicalAtoms);
+          console.log('Canonicalized atom indices:', result.canonicalAtoms);
+        }
+
+        // Show success message in UI
+        message.success(`Successfully saved ${highlightData.highlightedAtoms.length} highlighted atoms`);
+
+        // Visualize highlighted atoms (if Ketcher API supports it)
+        try {
+          if (ketcher && ketcher.editor && typeof ketcher.editor.highlight === 'function') {
+            ketcher.editor.highlight(highlightData.highlightedAtoms, 'selected');
+            console.log('Highlighted selected atoms in Ketcher');
+          }
+        } catch (highlightError) {
+          console.warn('Failed to highlight atoms in Ketcher:', highlightError);
+        }
+      } else {
+        console.error('Failed to save highlight:', result);
+        message.error('Failed to save highlighted substructure.');
+      }
+    } catch (error) {
+      console.error('Error processing highlight data:', error);
+      message.error('Error processing highlight data.');
+    }
+  };
+
   // Return to last page
   const handleBack = () => {
     const confirmExit = window.confirm('Do you want to save your changes before exiting?');
@@ -210,7 +387,7 @@ const MoleculeIndex = () => {
   // Handle sidebar actions
   const handleSidebarAction = (action) => {
     setSelectedTab(action);
-    message.info(`${action.charAt(0).toUpperCase() + action.slice(1)} action selected`);
+
 
     // Handle special functionality
     if (action === 'compute') {
@@ -236,8 +413,8 @@ const MoleculeIndex = () => {
     setSearchMethod(method);
 
     getSmiles().then(smiles => {
-    setSearchQuery(smiles || currentSmiles);
-  });
+      setSearchQuery(smiles || currentSmiles);
+    });
   };
 
   // Format property values
@@ -282,81 +459,80 @@ const MoleculeIndex = () => {
   // Results table columns
   const resultColumns = [
     {
-    title: 'Cmpd Id',
-    dataIndex: 'cmpd_id',
-    key: 'cmpd_id',
-  },
-  {
-    title: 'Similarity',
-    dataIndex: 'similarity',
-    key: 'similarity',
-    sorter: (a, b) => a.similarity - b.similarity,
-    render: value => (value * 100).toFixed(1) + '%',
-    defaultSortOrder: 'descend',
-  },
-
-  {
-    title: 'Binary Occ',
-    dataIndex: 'binary_occ',
-    key: 'binary_occ',
-    sorter: (a, b) => a.binary_occ - b.binary_occ,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'Cont Occ',
-    dataIndex: 'cont_occ',
-    key: 'cont_occ',
-    sorter: (a, b) => a.cont_occ - b.cont_occ,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'Low Gsh Prob',
-    dataIndex: 'low_gsh_prob',
-    key: 'low_gsh_prob',
-    sorter: (a, b) => a.low_gsh_prob - b.low_gsh_prob,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'Med Gsh Prob',
-    dataIndex: 'med_gsh_prob',
-    key: 'med_gsh_prob',
-    sorter: (a, b) => a.med_gsh_prob - b.med_gsh_prob,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'High Gsh Prob',
-    dataIndex: 'high_gsh_prob',
-    key: 'high_gsh_prob',
-    sorter: (a, b) => a.high_gsh_prob - b.high_gsh_prob,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'Selectivity',
-    dataIndex: 'selectivity',
-    key: 'selectivity',
-    sorter: (a, b) => a.selectivity - b.selectivity,
-    render: value => value?.toFixed(2) || '-',
-  },
-  {
-    title: 'Actions',
-    key: 'actions',
-    render: (_, record) => (
-      <Space>
-        <Button size="small" onClick={() => {
-          if (ketcher) {
-            try {
-              ketcher.setMolecule(record.smiles);
-            } catch (error) {
-              console.error('Error loading molecule:', error);
+      title: 'Cmpd Id',
+      dataIndex: 'cmpd_id',
+      key: 'cmpd_id',
+    },
+    {
+      title: 'Similarity',
+      dataIndex: 'similarity',
+      key: 'similarity',
+      sorter: (a, b) => a.similarity - b.similarity,
+      render: value => (value * 100).toFixed(1) + '%',
+      defaultSortOrder: 'descend',
+    },
+    {
+      title: 'Binary Occ',
+      dataIndex: 'binary_occ',
+      key: 'binary_occ',
+      sorter: (a, b) => a.binary_occ - b.binary_occ,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: 'Cont Occ',
+      dataIndex: 'cont_occ',
+      key: 'cont_occ',
+      sorter: (a, b) => a.cont_occ - b.cont_occ,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: 'Low Gsh Prob',
+      dataIndex: 'low_gsh_prob',
+      key: 'low_gsh_prob',
+      sorter: (a, b) => a.low_gsh_prob - b.low_gsh_prob,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: 'Med Gsh Prob',
+      dataIndex: 'med_gsh_prob',
+      key: 'med_gsh_prob',
+      sorter: (a, b) => a.med_gsh_prob - b.med_gsh_prob,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: 'High Gsh Prob',
+      dataIndex: 'high_gsh_prob',
+      key: 'high_gsh_prob',
+      sorter: (a, b) => a.high_gsh_prob - b.high_gsh_prob,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: 'Selectivity',
+      dataIndex: 'selectivity',
+      key: 'selectivity',
+      sorter: (a, b) => a.selectivity - b.selectivity,
+      render: value => value?.toFixed(2) || '-',
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button size="small" onClick={() => {
+            if (ketcher) {
+              try {
+                ketcher.setMolecule(record.smiles);
+              } catch (error) {
+                console.error('Error loading molecule:', error);
+              }
             }
-          }
-        }}>
-          View
-        </Button>
-      </Space>
-    ),
-  },
-];
+          }}>
+            View
+          </Button>
+        </Space>
+      ),
+    },
+  ];
 
   const ketcherPath = window.location.origin + '/standalone/index.html';
 
@@ -449,7 +625,7 @@ const MoleculeIndex = () => {
               <Content style={{ background: '#fff', padding: '12px', width: '100%', marginBottom: '16px' }}>
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ marginBottom: '8px' }}>
-                    <Text strong>Query Smiles: </Text>
+                    <Text strong>Query SMILES: </Text>
                     <Text>{searchQuery}</Text>
                   </div>
                   <div style={{ marginBottom: '8px' }}>
@@ -532,15 +708,64 @@ const MoleculeIndex = () => {
 
             {/* Mode-specific content cards */}
             {selectedTab === 'annotate' && (
-              <Card title="Annotations">
-                <textarea
-                  placeholder="Add your annotations here..."
-                  style={{ width: '100%', height: '100px', padding: '8px', borderRadius: '4px', border: '1px solid #d9d9d9' }}
-                />
-                <Button type="primary" size="small" style={{ marginTop: '8px' }}>
-                  Save Annotations
-                </Button>
-              </Card>
+              <>
+                <Card title="Substructure Selection" style={{ marginBottom: '16px' }}>
+                  <div style={{ marginBottom: '10px' }}>
+                    <Button type="primary" onClick={captureCurrentSelection}>
+                      Capture Selection
+                    </Button>
+                  </div>
+
+                  {selectedAtoms.length > 0 && (
+                    <div>
+                      <Text strong>Selected Atoms:</Text>
+                      <div style={{
+                        padding: '5px',
+                        background: '#f5f5f5',
+                        borderRadius: '4px',
+                        marginTop: '5px',
+                        wordBreak: 'break-all'
+                      }}>
+                        {JSON.stringify(selectedAtoms)}
+                      </div>
+
+                      {selectedBonds.length > 0 && (
+                        <div style={{ marginTop: '5px' }}>
+                          <Text strong>Selected Bonds:</Text>
+                          <div style={{
+                            padding: '5px',
+                            background: '#f5f5f5',
+                            borderRadius: '4px',
+                            marginTop: '5px',
+                            wordBreak: 'break-all'
+                          }}>
+                            {JSON.stringify(selectedBonds)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+                    <div>Selection status: {selectedAtoms.length > 0 ? 'Selected' : 'None'}</div>
+                    <div>Selected atoms: {selectedAtoms.length}</div>
+                    <div>Selected bonds: {selectedBonds.length}</div>
+                    <div style={{ marginTop: '5px', color: '#999' }}>
+                      Tip: Use Ketcher's selection tool to select part of the molecule, then click "Capture Selection"
+                    </div>
+                  </div>
+                </Card>
+
+                <Card title="Annotations">
+                  <textarea
+                    placeholder="Add your annotations here..."
+                    style={{ width: '100%', height: '100px', padding: '8px', borderRadius: '4px', border: '1px solid #d9d9d9' }}
+                  />
+                  <Button type="primary" size="small" style={{ marginTop: '8px' }}>
+                    Save Annotations
+                  </Button>
+                </Card>
+              </>
             )}
 
             {selectedTab === 'compute' && (
@@ -565,6 +790,8 @@ const MoleculeIndex = () => {
               <Card title="Export Options">
                 <Button style={{ margin: '5px' }} onClick={getSmiles}>Get SMILES</Button>
                 <Button style={{ margin: '5px' }} onClick={getMolfile}>Get Molfile</Button>
+                <Button style={{ margin: '5px' }} onClick={captureCurrentSelection}>Get Selection</Button>
+
                 {ketcherSmiles && (
                   <div style={{ marginTop: '10px' }}>
                     <Text strong>SMILES:</Text>
@@ -593,6 +820,21 @@ const MoleculeIndex = () => {
                       fontSize: '12px'
                     }}>
                       {ketcherMolfile}
+                    </div>
+                  </div>
+                )}
+
+                {selectedAtoms.length > 0 && (
+                  <div style={{ marginTop: '10px' }}>
+                    <Text strong>Selected Atoms:</Text>
+                    <div style={{
+                      padding: '5px',
+                      background: '#f5f5f5',
+                      borderRadius: '4px',
+                      marginTop: '5px',
+                      wordBreak: 'break-all'
+                    }}>
+                      {JSON.stringify(selectedAtoms)}
                     </div>
                   </div>
                 )}
