@@ -33,10 +33,11 @@ cd SuperGlue
 cd backend
 ```
 #### **(2) Set Up a Virtual Environment (Recommended)**
+**Create the Virtual Environment**
 ```
 python -m venv venv
 ```
-#### **(3) Activate the Virtual Environment**
+**Activate the Virtual Environment**
 - **For Windows (PowerShell):**
     ```
     .\venv\Scripts\activate
@@ -50,11 +51,11 @@ python -m venv venv
     ```
     source venv/bin/activate
     ```
-#### **(4) Install Dependencies**
+#### **(3) Install Dependencies**
 ```
 pip install -r requirements.txt
 ```
-#### **(5) Start the Backend Server**
+#### **(4) Start the Backend Server**
 ```
 python app.py
 ```
