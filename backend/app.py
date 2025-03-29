@@ -4,7 +4,6 @@ from molecule_annotate import get_compounds
 from editor_annotate import get_annotations, add_annotation, update_annotation, delete_annotation
 from file_upload import upload_file
 from molecule_convert import convert_molecule
-from molecule_visualize import MoleculeVisualizer
 from molecule_similarity import similarity_search
 import json
 import os
@@ -28,7 +27,6 @@ CORS(app, resources={
     r"/get_molecule_image/*": {"origins": "*"}
 })
 
-visualizer = MoleculeVisualizer(data_dir='data')
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'data')
 
 @app.route('/api/upload', methods=['POST'])
@@ -94,22 +92,7 @@ def handle_convert_molecule():
 def handle_get_compounds():
     return get_compounds()
 
-@app.route('/get_molecule_image/<cmpd_id>', methods=['GET'])
-def handle_visualize(cmpd_id):
-    try:
-        filename = request.args.get('filename')
-        if not filename:
-            return jsonify({
-                'success': False,
-                'error': 'Missing filename'
-            }), 400
-        result = visualizer.process_request(cmpd_id, filename)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+
 
 # New annotation endpoints
 @app.route('/api/annotations/<molecule_id>', methods=['GET'])
