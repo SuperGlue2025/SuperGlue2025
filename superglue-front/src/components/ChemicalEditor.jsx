@@ -11,8 +11,10 @@ import {
   SearchOutlined,
   TableOutlined
 } from '@ant-design/icons';
+import { FilterOutlined } from '@ant-design/icons';
 import SimilaritySearch from './SimilaritySearch';
 import '../styles/main.css';
+import SidebarFilter from './SidebarFilter';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -53,6 +55,29 @@ const MoleculeIndex = () => {
   // Get dynamic molecule property from CSV
   const [moleculeProperties, setMoleculeProperties] = useState({});
   const [propertyKeys, setPropertyKeys] = useState([]);
+
+  //annotations:
+  const [annotations, setAnnotations] = useState([]);
+  const [currentAnnotation, setCurrentAnnotation] = useState('');
+  const [isLoadingAnnotations, setIsLoadingAnnotations] = useState(false);
+  const [isSavingAnnotation, setIsSavingAnnotation] = useState(false);
+
+  //State for filter sidebar
+  const [showFilterSidebar, setShowFilterSidebar] = useState(false);
+  const [filtersActive, setFiltersActive] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({});
+  const [enabledFilters, setEnabledFilters] = useState({
+    similarity: true,
+    binary_occ: false,
+    cont_occ: false,
+    low_gsh_prob: false,
+    med_gsh_prob: false,
+    high_gsh_prob: false,
+    selectivity: false
+  });
+
+  // Store original results for filter reset
+  const [originalResults, setOriginalResults] = useState([]);
 
   // Get data from last webpage
   const smilesFromCSV = location.state?.smiles;
@@ -220,7 +245,7 @@ const MoleculeIndex = () => {
     if (!ketcherInstance) {
       console.error('Error: Ketcher instance not initialized');
       message.error('Ketcher instance not initialized');
-      return;
+      return null;
     }
 
     try {
@@ -230,7 +255,7 @@ const MoleculeIndex = () => {
       if (!editorSelection) {
         console.warn('No selection detected, please select part of the molecule first');
         message.warning('No selection detected, please select part of the molecule first');
-        return;
+        return null;
       }
 
       // Get atoms and bonds from selection
@@ -244,7 +269,7 @@ const MoleculeIndex = () => {
       if (atoms.length === 0 && bonds.length === 0) {
         console.warn('No atoms or bonds selected');
         message.warning('No atoms or bonds selected, please select part of the molecule first');
-        return;
+        return null;
       }
 
       // Update state
@@ -272,15 +297,11 @@ const MoleculeIndex = () => {
       setHighlightedSubstructure(highlightData);
       console.log('Highlight substructure object:', highlightData);
 
-      // Save highlighted atom data
-      if (atoms.length > 0) {
-        saveHighlightedAtoms(highlightData);
-        message.success(`Successfully captured ${atoms.length} selected atoms`);
-      }
-
+      return highlightData;
     } catch (error) {
       console.error('Error getting selected substructure:', error);
       message.error('Failed to get selected substructure');
+      return null;
     }
   };
 
@@ -301,7 +322,12 @@ const MoleculeIndex = () => {
     }
 
     // Get selection
-    getSelectedSubstructure(ketcher);
+    getSelectedSubstructure(ketcher).then(highlightData => {
+      if (highlightData) {
+        // saveHighlightedAtoms(highlightData);
+        message.success(`Successfully captured ${highlightData.highlightedAtoms.length} selected atoms`);
+      }
+    });
   };
 
   // Add helper function to show Ketcher's selection status
@@ -326,51 +352,111 @@ const MoleculeIndex = () => {
     }
   };
 
-
-  // Improved saveHighlightedAtoms function
-  const saveHighlightedAtoms = async (highlightData) => {
+  // Improved saveHighlightedAtoms function to include annotation
+  const saveHighlightedAtoms = async (highlightData, annotation = '') => {
     try {
       // Check if any atoms are selected
       if (!highlightData.highlightedAtoms || highlightData.highlightedAtoms.length === 0) {
         console.warn('No atoms selected, no need to save');
+        message.warning('No atoms selected, please select part of the molecule first');
         return;
       }
 
-      // Simulate backend response (in actual project, request would be sent to backend)
-      const result = {
-        success: true,
-        message: 'Highlighted atoms saved with canonical ordering',
-        canonicalAtoms: [...highlightData.highlightedAtoms].sort((a, b) => a - b)
+      // Set saving state
+      setIsSavingAnnotation(true);
+
+      // Construct the payload with annotation
+      const payload = {
+        id: moleculeId,                      // Current molecule ID
+        filename: filename || '',            // Source CSV filename
+        smiles: highlightData.smiles,        // Current molecule SMILES
+        atoms: highlightData.highlightedAtoms,
+        bonds: highlightData.highlightedBonds,
+        annotation: annotation               // Add annotation text
       };
 
-      console.log('Save highlight result:', result);
+      console.log('Sending payload to server:', payload);
 
-      if (result.success) {
-        // Update local state with canonicalized atom indices
+      // Fix the endpoint URL to match your Flask route
+      const response = await fetch(`http://localhost:5001/api/annotate_molecule`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      // For better debugging, log the raw response first
+      const responseText = await response.text();
+      console.log('Server response (raw):', responseText);
+
+      // Then try to parse it as JSON
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (error) {
+        console.error('Error parsing server response:', error);
+        message.error('Invalid response from server');
+        setIsSavingAnnotation(false);
+        return;
+      }
+
+      if (response.ok && result.success) {
+        const successMessage = annotation
+          ? `Highlight and annotation saved successfully for molecule ${moleculeId}`
+          : `Highlight saved successfully for molecule ${moleculeId}`;
+
+        message.success(successMessage);
+        console.log('Server response:', result);
+
+        // Optional: update local state if backend returns canonical atoms
         if (result.canonicalAtoms) {
           setSelectedAtoms(result.canonicalAtoms);
-          console.log('Canonicalized atom indices:', result.canonicalAtoms);
         }
 
-        // Show success message in UI
-        message.success(`Successfully saved ${highlightData.highlightedAtoms.length} highlighted atoms`);
-
-        // Visualize highlighted atoms (if Ketcher API supports it)
-        try {
-          if (ketcher && ketcher.editor && typeof ketcher.editor.highlight === 'function') {
-            ketcher.editor.highlight(highlightData.highlightedAtoms, 'selected');
-            console.log('Highlighted selected atoms in Ketcher');
-          }
-        } catch (highlightError) {
-          console.warn('Failed to highlight atoms in Ketcher:', highlightError);
+        // Frontend highlighting
+        if (ketcher && ketcher.editor?.highlight) {
+          ketcher.editor.highlight(payload.atoms, 'selected');
         }
+
+        // Clear annotation text after successful save
+        setCurrentAnnotation('');
       } else {
-        console.error('Failed to save highlight:', result);
-        message.error('Failed to save highlighted substructure.');
+        console.error('Server error:', result);
+        message.error(`Failed to save: ${result.message || 'unknown error'}`);
       }
     } catch (error) {
-      console.error('Error processing highlight data:', error);
-      message.error('Error processing highlight data.');
+      console.error('Error sending data to server:', error);
+      message.error('Error sending data to backend');
+    } finally {
+      setIsSavingAnnotation(false);
+    }
+  };
+
+  // Combined function to capture selection and save annotation
+  const captureAndAnnotate = async () => {
+    if (!ketcher) {
+      message.error('Ketcher instance not initialized');
+      return;
+    }
+
+    console.log('Capturing selection and annotation...');
+
+    // Confirm editor object exists
+    if (!ketcher.editor) {
+      console.error('Ketcher editor object does not exist');
+      message.error('Cannot access Ketcher editor');
+      return;
+    }
+
+    // Get selection and SMILES
+    const highlightData = await getSelectedSubstructure(ketcher);
+
+    if (highlightData && highlightData.highlightedAtoms && highlightData.highlightedAtoms.length > 0) {
+      // Save with annotation
+      await saveHighlightedAtoms(highlightData, currentAnnotation);
+    } else {
+      message.warning('Please select part of the molecule first');
     }
   };
 
@@ -409,12 +495,97 @@ const MoleculeIndex = () => {
   // Handle similarity search results
   const handleSimilarityResults = (results, method) => {
     setSimilarityResults(results);
+    setOriginalResults(results); // Store original results for filtering
     setShowResultsTable(true);
     setSearchMethod(method);
+    setFiltersActive(false);
+    setActiveFilters({});
+
+    // Extract actual min/max for each property and prepare ranges for filter initialization
+    const ranges = {};
+    const propertiesToCheck = ['similarity', 'binary_occ', 'cont_occ', 'low_gsh_prob', 'med_gsh_prob', 'high_gsh_prob', 'selectivity'];
+
+    propertiesToCheck.forEach(prop => {
+      const values = results
+        .map(result => result[prop])
+        .filter(val => val !== undefined && val !== null && !isNaN(val));
+
+      if (values.length > 0) {
+        // Calculate actual min and max
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+
+        // Add small buffer to max value (5% of range) to ensure values at max are included
+        const buffer = (max - min) * 0.05;
+        const adjustedMax = max + buffer;
+
+        // Store the range
+        ranges[prop] = [min, adjustedMax];
+        console.log(`Property ${prop} range: [${min}, ${adjustedMax}]`);
+      }
+    });
 
     getSmiles().then(smiles => {
       setSearchQuery(smiles || currentSmiles);
     });
+  };
+
+  // Handle filter application
+  const handleApplyFilters = (filters) => {
+    setIsSearching(true);
+    setActiveFilters(filters);
+    setFiltersActive(true);
+
+    try {
+      // Get the enabled filters
+      const enabledFilterKeys = Object.keys(filters);
+
+      // Update enabled filters state
+      const newEnabledFilters = {};
+      Object.keys(enabledFilters).forEach(key => {
+        newEnabledFilters[key] = enabledFilterKeys.includes(key);
+      });
+      setEnabledFilters(newEnabledFilters);
+
+      // Apply filters to the original results
+      const filteredResults = originalResults.filter(result => {
+        // Check each enabled filter
+        return enabledFilterKeys.every(property => {
+          const value = result[property];
+          const range = filters[property];
+          // Safety check for undefined or null values
+          return value !== undefined && value !== null && !isNaN(value) &&
+                 value >= range[0] && value <= range[1];
+        });
+      });
+
+      // Update the results table
+      setSimilarityResults(filteredResults);
+      message.success(`Applied filters: Found ${filteredResults.length} results`);
+    } catch (error) {
+      console.error('Error applying filters:', error);
+      message.error('Failed to apply filters');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle clearing filters
+  const handleClearFilters = () => {
+    setFiltersActive(false);
+    setActiveFilters({});
+    setEnabledFilters({
+      similarity: true,
+      binary_occ: false,
+      cont_occ: false,
+      low_gsh_prob: false,
+      med_gsh_prob: false,
+      high_gsh_prob: false,
+      selectivity: false
+    });
+    // Restore original search results
+    setSimilarityResults(originalResults);
+    message.info('Filters cleared');
   };
 
   // Format property values
@@ -456,7 +627,7 @@ const MoleculeIndex = () => {
     return {};
   };
 
-  // Results table columns
+  // Results table columns with filter indicators
   const resultColumns = [
     {
       title: 'Cmpd Id',
@@ -464,7 +635,14 @@ const MoleculeIndex = () => {
       key: 'cmpd_id',
     },
     {
-      title: 'Similarity',
+      title: (
+        <span>
+          Similarity
+          {filtersActive && activeFilters.similarity && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
       dataIndex: 'similarity',
       key: 'similarity',
       sorter: (a, b) => a.similarity - b.similarity,
@@ -472,42 +650,84 @@ const MoleculeIndex = () => {
       defaultSortOrder: 'descend',
     },
     {
-      title: 'Binary Occ',
+      title: (
+        <span>
+          Binary Occ
+          {filtersActive && activeFilters.binary_occ && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
       dataIndex: 'binary_occ',
       key: 'binary_occ',
       sorter: (a, b) => a.binary_occ - b.binary_occ,
       render: value => value?.toFixed(2) || '-',
     },
     {
-      title: 'Cont Occ',
+      title: (
+        <span>
+          Cont Occ
+          {filtersActive && activeFilters.cont_occ && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
       dataIndex: 'cont_occ',
       key: 'cont_occ',
       sorter: (a, b) => a.cont_occ - b.cont_occ,
       render: value => value?.toFixed(2) || '-',
     },
     {
-      title: 'Low Gsh Prob',
+      title: (
+        <span>
+          Low Gsh Prob
+          {filtersActive && activeFilters.low_gsh_prob && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
       dataIndex: 'low_gsh_prob',
       key: 'low_gsh_prob',
       sorter: (a, b) => a.low_gsh_prob - b.low_gsh_prob,
       render: value => value?.toFixed(2) || '-',
     },
     {
-      title: 'Med Gsh Prob',
+      title: (
+        <span>
+          Med Gsh Prob
+          {filtersActive && activeFilters.med_gsh_prob && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
       dataIndex: 'med_gsh_prob',
       key: 'med_gsh_prob',
       sorter: (a, b) => a.med_gsh_prob - b.med_gsh_prob,
       render: value => value?.toFixed(2) || '-',
     },
     {
-      title: 'High Gsh Prob',
+      title: (
+        <span>
+          High Gsh Prob
+          {filtersActive && activeFilters.high_gsh_prob && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
       dataIndex: 'high_gsh_prob',
       key: 'high_gsh_prob',
       sorter: (a, b) => a.high_gsh_prob - b.high_gsh_prob,
       render: value => value?.toFixed(2) || '-',
     },
     {
-      title: 'Selectivity',
+      title: (
+        <span>
+          Selectivity
+          {filtersActive && activeFilters.selectivity && (
+            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+          )}
+        </span>
+      ),
       dataIndex: 'selectivity',
       key: 'selectivity',
       sorter: (a, b) => a.selectivity - b.selectivity,
@@ -580,9 +800,22 @@ const MoleculeIndex = () => {
           <div>
             <Text strong>Current Mode: </Text>
             <Text>{selectedTab.charAt(0).toUpperCase() + selectedTab.slice(1)}</Text>
+            {filtersActive && (
+              <Text type="secondary" style={{ marginLeft: '10px' }}>
+                (Filters Applied: {Object.keys(activeFilters).length})
+              </Text>
+            )}
           </div>
           {showResultsTable && selectedTab === 'similarity' && (
             <div>
+              <Button
+                type={showFilterSidebar ? 'primary' : 'default'}
+                icon={<FilterOutlined />}
+                style={{ marginRight: '8px' }}
+                onClick={() => setShowFilterSidebar(!showFilterSidebar)}
+                >
+                {showFilterSidebar ? 'Hide Filters' : 'Show Filters'}
+              </Button>
               <Button
                 type="primary"
                 icon={<TableOutlined />}
@@ -598,27 +831,53 @@ const MoleculeIndex = () => {
           </div>
         </Header>
 
-        <Layout style={{ padding: '24px' }}>
+        <Layout style={{ padding: '24px', overflow: 'auto' }}>
           {/* Main content layout with conditional height based on results visibility */}
           <Layout>
+            {/* Filter sidebar (conditionally rendered) */}
+            {showFilterSidebar && (
+              <Sider
+                width={280}
+                style={{
+                  background: '#fff',
+                  marginRight: '16px',
+                  borderRadius: '4px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                  height: 'fit-content',
+                }}
+              >
+                <SidebarFilter
+                  isVisible={true}
+                  searchResults={originalResults.length > 0 ? originalResults : similarityResults}
+                  onApplyFilters={handleApplyFilters}
+                  onClearFilters={handleClearFilters}
+                  currentSmiles={currentSmiles}
+                  isLoading={isSearching}
+                />
+              </Sider>
+            )}
+
             {/* Ketcher editor area */}
-            <Content
-              style={{
-                background: '#fff',
-                padding: '12px',
-                width: '100%',
-                height: showResultsTable ? 'calc(60vh - 112px)' : 'calc(100vh - 112px)',
-                marginBottom: showResultsTable ? '16px' : '0',
-                transition: 'height 0.3s ease'
-              }}
-            >
-              <iframe
-                id="idKetcher"
-                ref={iframeRef}
-                src={ketcherPath}
-                style={{ width: '100%', height: '100%', border: 'none' }}
-              />
-            </Content>
+            {!showFilterSidebar && (
+              <Content
+                style={{
+                  background: '#fff',
+                  padding: '12px',
+                  width: '100%',
+                  height: showResultsTable ? 'calc(50vh - 112px)' : 'calc(80vh - 112px)',
+                  marginBottom: showResultsTable ? '16px' : '0',
+                  transition: 'height 0.3s ease',
+                  overflow: 'auto'
+                }}
+              >
+                <iframe
+                  id="idKetcher"
+                  ref={iframeRef}
+                  src={ketcherPath}
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                />
+              </Content>
+            )}
 
             {/* Similarity Results Table (conditionally rendered) */}
             {showResultsTable && (
@@ -631,8 +890,36 @@ const MoleculeIndex = () => {
                   <div style={{ marginBottom: '8px' }}>
                     <Text strong>Similarity Metric: </Text>
                     <Text>{searchMethod.charAt(0).toUpperCase() + searchMethod.slice(1)}</Text>
+                    {filtersActive && (
+                      <Text type="secondary" style={{ marginLeft: '10px' }}>
+                        (Filters Applied)
+                      </Text>
+                    )}
                   </div>
-                  <Text strong>Search Results</Text>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <Text strong>Search Results: </Text>
+                      <Text>{similarityResults.length} compounds</Text>
+                    </div>
+                    <div>
+                      <Button
+                        icon={<FilterOutlined />}
+                        onClick={() => setShowFilterSidebar(!showFilterSidebar)}
+                        type={showFilterSidebar ? 'primary' : 'default'}
+                        style={{ marginRight: '8px' }}
+                      >
+                        {showFilterSidebar ? 'Hide Filters' : 'Show Filters'}
+                      </Button>
+                      {filtersActive && (
+                        <Button
+                          onClick={handleClearFilters}
+                          style={{ marginRight: '8px' }}
+                        >
+                          Reset Filters
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <Table
@@ -648,76 +935,192 @@ const MoleculeIndex = () => {
                 />
               </Content>
             )}
-
           </Layout>
 
           {/* Right sidebar with properties */}
-          <Sider width="30%" style={{ background: '#f0f2f5', marginLeft: '16px' }}>
-            {/* Basic Information card */}
-            <Card title="Basic Information" style={{ marginBottom: '16px' }}>
-              <List size="small">
-                <List.Item>
-                  <Text strong style={{ width: '40%' }}>ID:</Text>
-                  <Text>{moleculeName}</Text>
-                </List.Item>
-                {sourceData && sourceData[smilesColumn] && (
+          {!showFilterSidebar && (
+            <Sider width="30%" style={{ background: '#f0f2f5', marginLeft: '16px', overflowY: 'auto' }}>
+              {/* Basic Information card */}
+              <Card title="Basic Information" style={{ marginBottom: '16px' }}>
+                <List size="small">
                   <List.Item>
-                    <Text strong style={{ width: '40%' }}>SMILES:</Text>
-                    <Text style={{ wordBreak: 'break-all' }}>
-                      {sourceData[smilesColumn].length > 50
-                        ? sourceData[smilesColumn].substring(0, 50) + '...'
-                        : sourceData[smilesColumn]
-                      }
-                    </Text>
+                    <Text strong style={{ width: '40%' }}>ID:</Text>
+                    <Text>{moleculeName}</Text>
                   </List.Item>
-                )}
-                {filename && (
-                  <List.Item>
-                    <Text strong style={{ width: '40%' }}>Source:</Text>
-                    <Text>{filename}</Text>
-                  </List.Item>
-                )}
-              </List>
-            </Card>
-
-            {/* Properties from CSV */}
-            {propertyKeys.length > 0 ? (
-              <Card title="Properties from CSV" style={{ marginBottom: '16px' }}>
-                <List
-                  size="small"
-                  itemLayout="horizontal"
-                  dataSource={propertyKeys}
-                  renderItem={key => {
-                    const value = moleculeProperties[key];
-                    return (
-                      <List.Item style={getPropertyCardStyle(key, value)}>
-                        <Text strong style={{ width: '50%' }}>{key}:</Text>
-                        <Text>{formatPropertyValue(value)}</Text>
-                      </List.Item>
-                    );
-                  }}
-                />
+                  {sourceData && sourceData[smilesColumn] && (
+                    <List.Item>
+                      <Text strong style={{ width: '40%' }}>SMILES:</Text>
+                      <Text style={{ wordBreak: 'break-all' }}>
+                        {sourceData[smilesColumn].length > 50
+                          ? sourceData[smilesColumn].substring(0, 50) + '...'
+                          : sourceData[smilesColumn]
+                        }
+                      </Text>
+                    </List.Item>
+                  )}
+                  {filename && (
+                    <List.Item>
+                      <Text strong style={{ width: '40%' }}>Source:</Text>
+                      <Text>{filename}</Text>
+                    </List.Item>
+                  )}
+                </List>
               </Card>
-            ) : (
-              fromCsv && (
-                <Card title="Properties from CSV" style={{ marginBottom: '16px' }}>
-                  <Text type="secondary">No additional properties found in CSV.</Text>
-                </Card>
-              )
-            )}
 
-            {/* Mode-specific content cards */}
-            {selectedTab === 'annotate' && (
-              <>
-                <Card title="Substructure Selection" style={{ marginBottom: '16px' }}>
+              {/* Properties from CSV */}
+              {propertyKeys.length > 0 ? (
+                <Card title="Properties from CSV" style={{ marginBottom: '16px' }}>
+                  <List
+                    size="small"
+                    itemLayout="horizontal"
+                    dataSource={propertyKeys}
+                    renderItem={key => {
+                      const value = moleculeProperties[key];
+                      return (
+                        <List.Item style={getPropertyCardStyle(key, value)}>
+                          <Text strong style={{ width: '50%' }}>{key}:</Text>
+                          <Text>{formatPropertyValue(value)}</Text>
+                        </List.Item>
+                      );
+                    }}
+                  />
+                </Card>
+              ) : (
+                fromCsv && (
+                  <Card title="Properties from CSV" style={{ marginBottom: '16px' }}>
+                    <Text type="secondary">No additional properties found in CSV.</Text>
+                  </Card>
+                )
+              )}
+
+              {/* Mode-specific content cards */}
+              {selectedTab === 'annotate' && (
+                <>
+                  <Card title="Substructure Selection" style={{ marginBottom: '16px' }}>
+                    <div style={{ marginBottom: '10px' }}>
+                      <Button type="primary" onClick={captureCurrentSelection}>
+                        Capture Selection
+                      </Button>
+                    </div>
+
+                    {selectedAtoms.length > 0 && (
+                      <div>
+                        <Text strong>Selected Atoms:</Text>
+                        <div style={{
+                          padding: '5px',
+                          background: '#f5f5f5',
+                          borderRadius: '4px',
+                          marginTop: '5px',
+                          wordBreak: 'break-all'
+                        }}>
+                          {JSON.stringify(selectedAtoms)}
+                        </div>
+
+                        {selectedBonds.length > 0 && (
+                          <div style={{ marginTop: '5px' }}>
+                            <Text strong>Selected Bonds:</Text>
+                            <div style={{
+                              padding: '5px',
+                              background: '#f5f5f5',
+                              borderRadius: '4px',
+                              marginTop: '5px',
+                              wordBreak: 'break-all'
+                            }}>
+                              {JSON.stringify(selectedBonds)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+                      <div>Selection status: {selectedAtoms.length > 0 ? 'Selected' : 'None'}</div>
+                      <div>Selected atoms: {selectedAtoms.length}</div>
+                      <div>Selected bonds: {selectedBonds.length}</div>
+                      <div style={{ marginTop: '5px', color: '#999' }}>
+                        Tip: Use Ketcher's selection tool to select part of the molecule, then click "Capture Selection"
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card title="Annotations">
+                    <textarea
+                      placeholder="Add your annotations here..."
+                      style={{ width: '100%', height: '100px', padding: '8px', borderRadius: '4px', border: '1px solid #d9d9d9' }}
+                      value={currentAnnotation}
+                      onChange={(e) => setCurrentAnnotation(e.target.value)}
+                    />
+                    <Button
+                      type="primary"
+                      size="small"
+                      style={{ marginTop: '8px' }}
+                      onClick={captureAndAnnotate}
+                      loading={isSavingAnnotation}
+                    >
+                      Save with Annotation
+                    </Button>
+                  </Card>
+                </>
+              )}
+
+              {selectedTab === 'compute' && (
+                <Card title="Calculated Properties">
                   <div style={{ marginBottom: '10px' }}>
-                    <Button type="primary" onClick={captureCurrentSelection}>
-                      Capture Selection
+                    <Button type="primary" size="small" onClick={getSmiles}>
+                      Calculate Properties
                     </Button>
                   </div>
+                  {ketcherSmiles && (
+                    <div>
+                      <Text strong>SMILES:</Text>
+                      <div style={{ wordBreak: 'break-all', margin: '5px 0 10px' }}>
+                        <Text>{ketcherSmiles}</Text>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {selectedTab === 'export' && (
+                <Card title="Export Options">
+                  <Button style={{ margin: '5px' }} onClick={getSmiles}>Get SMILES</Button>
+                  <Button style={{ margin: '5px' }} onClick={getMolfile}>Get Molfile</Button>
+                  <Button style={{ margin: '5px' }} onClick={captureCurrentSelection}>Get Selection</Button>
+
+                  {ketcherSmiles && (
+                    <div style={{ marginTop: '10px' }}>
+                      <Text strong>SMILES:</Text>
+                      <div style={{
+                        padding: '5px',
+                        background: '#f5f5f5',
+                        borderRadius: '4px',
+                        marginTop: '5px',
+                        wordBreak: 'break-all'
+                      }}>
+                        {ketcherSmiles}
+                      </div>
+                    </div>
+                  )}
+                  {ketcherMolfile && (
+                    <div style={{ marginTop: '10px' }}>
+                      <Text strong>Molfile:</Text>
+                      <div style={{
+                        padding: '5px',
+                        background: '#f5f5f5',
+                        borderRadius: '4px',
+                        marginTop: '5px',
+                        height: '100px',
+                        overflow: 'auto',
+                        whiteSpace: 'pre-wrap',
+                        fontSize: '12px'
+                      }}>
+                        {ketcherMolfile}
+                      </div>
+                    </div>
+                  )}
 
                   {selectedAtoms.length > 0 && (
-                    <div>
+                    <div style={{ marginTop: '10px' }}>
                       <Text strong>Selected Atoms:</Text>
                       <div style={{
                         padding: '5px',
@@ -728,119 +1131,12 @@ const MoleculeIndex = () => {
                       }}>
                         {JSON.stringify(selectedAtoms)}
                       </div>
-
-                      {selectedBonds.length > 0 && (
-                        <div style={{ marginTop: '5px' }}>
-                          <Text strong>Selected Bonds:</Text>
-                          <div style={{
-                            padding: '5px',
-                            background: '#f5f5f5',
-                            borderRadius: '4px',
-                            marginTop: '5px',
-                            wordBreak: 'break-all'
-                          }}>
-                            {JSON.stringify(selectedBonds)}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
-
-                  <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
-                    <div>Selection status: {selectedAtoms.length > 0 ? 'Selected' : 'None'}</div>
-                    <div>Selected atoms: {selectedAtoms.length}</div>
-                    <div>Selected bonds: {selectedBonds.length}</div>
-                    <div style={{ marginTop: '5px', color: '#999' }}>
-                      Tip: Use Ketcher's selection tool to select part of the molecule, then click "Capture Selection"
-                    </div>
-                  </div>
                 </Card>
-
-                <Card title="Annotations">
-                  <textarea
-                    placeholder="Add your annotations here..."
-                    style={{ width: '100%', height: '100px', padding: '8px', borderRadius: '4px', border: '1px solid #d9d9d9' }}
-                  />
-                  <Button type="primary" size="small" style={{ marginTop: '8px' }}>
-                    Save Annotations
-                  </Button>
-                </Card>
-              </>
-            )}
-
-            {selectedTab === 'compute' && (
-              <Card title="Calculated Properties">
-                <div style={{ marginBottom: '10px' }}>
-                  <Button type="primary" size="small" onClick={getSmiles}>
-                    Calculate Properties
-                  </Button>
-                </div>
-                {ketcherSmiles && (
-                  <div>
-                    <Text strong>SMILES:</Text>
-                    <div style={{ wordBreak: 'break-all', margin: '5px 0 10px' }}>
-                      <Text>{ketcherSmiles}</Text>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            )}
-
-            {selectedTab === 'export' && (
-              <Card title="Export Options">
-                <Button style={{ margin: '5px' }} onClick={getSmiles}>Get SMILES</Button>
-                <Button style={{ margin: '5px' }} onClick={getMolfile}>Get Molfile</Button>
-                <Button style={{ margin: '5px' }} onClick={captureCurrentSelection}>Get Selection</Button>
-
-                {ketcherSmiles && (
-                  <div style={{ marginTop: '10px' }}>
-                    <Text strong>SMILES:</Text>
-                    <div style={{
-                      padding: '5px',
-                      background: '#f5f5f5',
-                      borderRadius: '4px',
-                      marginTop: '5px',
-                      wordBreak: 'break-all'
-                    }}>
-                      {ketcherSmiles}
-                    </div>
-                  </div>
-                )}
-                {ketcherMolfile && (
-                  <div style={{ marginTop: '10px' }}>
-                    <Text strong>Molfile:</Text>
-                    <div style={{
-                      padding: '5px',
-                      background: '#f5f5f5',
-                      borderRadius: '4px',
-                      marginTop: '5px',
-                      height: '100px',
-                      overflow: 'auto',
-                      whiteSpace: 'pre-wrap',
-                      fontSize: '12px'
-                    }}>
-                      {ketcherMolfile}
-                    </div>
-                  </div>
-                )}
-
-                {selectedAtoms.length > 0 && (
-                  <div style={{ marginTop: '10px' }}>
-                    <Text strong>Selected Atoms:</Text>
-                    <div style={{
-                      padding: '5px',
-                      background: '#f5f5f5',
-                      borderRadius: '4px',
-                      marginTop: '5px',
-                      wordBreak: 'break-all'
-                    }}>
-                      {JSON.stringify(selectedAtoms)}
-                    </div>
-                  </div>
-                )}
-              </Card>
-            )}
-          </Sider>
+              )}
+            </Sider>
+          )}
         </Layout>
       </Layout>
 

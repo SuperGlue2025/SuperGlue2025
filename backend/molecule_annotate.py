@@ -3,6 +3,7 @@ import pandas as pd
 from rdkit import Chem
 import os
 
+
 class MoleculeAnnotationService:
     def __init__(self):
         self.compounds_df = None
@@ -81,3 +82,36 @@ def get_compound(cmpd_id):
 
     compound = service.compounds_df[service.compounds_df['cmpd_id'] == cmpd_id].to_dict('records')
     return jsonify(compound[0] if compound else {})
+def get_smarts_smiles(mol_smiles, atom_indices, bond_indices):
+    mol = Chem.MolFromSmiles(mol_smiles)
+    if not mol:
+        return jsonify({"success": False, "message": "Invalid SMILES"}), 400
+
+    # create substructure
+    rwmol = Chem.RWMol()
+    old_idx_to_new = {}
+
+    # add atoms
+    for idx in atom_indices:
+        old_atom = mol.GetAtomWithIdx(idx)
+        new_atom = Chem.Atom(old_atom.GetSymbol())
+        new_idx = rwmol.AddAtom(new_atom)
+        old_idx_to_new[idx] = new_idx
+
+    # add bonds
+    for bond_idx in bond_indices:
+        bond = mol.GetBondWithIdx(bond_idx)
+        begin_idx = bond.GetBeginAtomIdx()
+        end_idx = bond.GetEndAtomIdx()
+        if begin_idx in old_idx_to_new and end_idx in old_idx_to_new:
+            rwmol.AddBond(old_idx_to_new[begin_idx], old_idx_to_new[end_idx], bond.GetBondType())
+
+    fragment_mol = rwmol.GetMol()
+    fragment_smiles = Chem.MolToSmiles(fragment_mol)
+    print(fragment_smiles)
+
+    # using isomericSmiles=True for simple
+    fragment_smarts = Chem.MolToSmarts(fragment_mol, isomericSmiles=True)
+    # fragment_smarts = Chem.MolFragmentToSmiles(fragment_mol)
+    print(fragment_smarts)
+    return fragment_smiles, fragment_smarts
