@@ -119,6 +119,11 @@ npm run dev
 If everything is working properly, the terminal will display information similar to the following:
 ![frontend](docs/frontend_result.png)
 
+## User Guide
+
+SuperGlue is designed to be user-friendly, allowing users to easily navigate and utilize its features.  
+[User Guide](docs/USER_GUIDE.md) provides detailed instructions on how to use the application, including uploading datasets, visualizing molecular structures, and performing different actions.
+
 ## Usage
 
 1. **Upload a CSV file** with compound IDs and SMILES.
