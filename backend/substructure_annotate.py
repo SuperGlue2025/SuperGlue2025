@@ -32,7 +32,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 def save_substructure(molecule_id, smiles, highlighted_atoms, highlighted_bonds=None,
                       fragment_smiles=None, fragment_smarts=None, annotation_text=None):
     """Save highlighted substructure information and annotation to database"""
@@ -49,7 +48,7 @@ def save_substructure(molecule_id, smiles, highlighted_atoms, highlighted_bonds=
         timestamp = datetime.now().isoformat()
 
         cursor.execute('''
-        INSERT INTO molecule_substructures 
+        INSERT INTO molecule_substructures
         (molecule_id, smiles, highlighted_atoms, highlighted_bonds, highlight_smiles, highlight_smarts, annotation_text, timestamp)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (molecule_id, smiles, atoms_json, bonds_json, fragment_smiles, fragment_smarts, annotation_text, timestamp))
@@ -62,8 +61,10 @@ def save_substructure(molecule_id, smiles, highlighted_atoms, highlighted_bonds=
             "success": True,
             "substructure_id": substructure_id,
             "message": f"Successfully saved substructure with {len(highlighted_atoms)} atoms" +
+                      (f" and {len(highlighted_bonds) if highlighted_bonds else 0} bonds" ) +
                       (f" and annotation" if annotation_text else ""),
             "canonicalAtoms": highlighted_atoms,
+            "canonicalBonds": highlighted_bonds,
             "smiles": fragment_smiles,
             "smarts": fragment_smarts
         }
@@ -74,17 +75,20 @@ def save_substructure(molecule_id, smiles, highlighted_atoms, highlighted_bonds=
             "error": str(e)
         }
 
-
-def get_molecule_substructures(molecule_id):
-    """Get all substructures for a specific molecule"""
+def get_molecule_highlights(molecule_id, filename=''):
+    """Retrieve all highlighted substructures for a specific molecule."""
     try:
-        # Ensure DB is initialized
+        # Ensure the database is initialized
         init_db()
+
+        import sqlite3
+        import json
 
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row  # Return results as dictionaries
         cursor = conn.cursor()
 
+        # Adjust the query based on your table schema
         cursor.execute('''
         SELECT * FROM molecule_substructures
         WHERE molecule_id = ?
@@ -94,21 +98,32 @@ def get_molecule_substructures(molecule_id):
         rows = cursor.fetchall()
         conn.close()
 
-        substructures = []
+        highlights = []
         for row in rows:
             row_dict = dict(row)
             # Parse JSON fields
-            row_dict['highlighted_atoms'] = json.loads(row_dict['highlighted_atoms'])
-            if row_dict['highlighted_bonds']:
-                row_dict['highlighted_bonds'] = json.loads(row_dict['highlighted_bonds'])
-            substructures.append(row_dict)
+            highlight = {
+                "id": row_dict.get('id'),
+                "smiles": row_dict.get('smiles', ''),
+                "atoms": json.loads(row_dict.get('highlighted_atoms', '[]')),
+                "bonds": json.loads(row_dict.get('highlighted_bonds', '[]')) if row_dict.get(
+                    'highlighted_bonds') else [],
+                "fragment_smiles": row_dict.get('highlight_smiles', ''),
+                "fragment_smarts": row_dict.get('highlight_smarts', ''),
+                "annotation": row_dict.get('annotation_text', ''),
+                "timestamp": row_dict.get('timestamp')
+            }
+            print(f"Constructed highlight object: {highlight}")
+
+            highlights.append(highlight)
 
         return {
             "success": True,
-            "substructures": substructures
+            "highlights": highlights
         }
     except Exception as e:
+        print(f"Error in get_molecule_highlights: {str(e)}")
         return {
             "success": False,
-            "error": str(e)
+            "message": f"Failed to retrieve highlighted substructures: {str(e)}"
         }
