@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from flask import Flask,send_from_directory,jsonify,request
 from flask_cors import CORS
 from molecule_annotate import get_compounds, get_smarts_smiles
@@ -192,6 +193,224 @@ def handle_get_molecule_highlights():
             "success": False,
             "message": str(e)
         }), 500
+=======
+# app.py  ─────────────────────────────────────────────────────────────────────
+import json, os, sqlite3, traceback
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+from rdkit import Chem
+from rdkit.Chem import AllChem
+
+from flask_bcrypt        import Bcrypt
+from flask_jwt_extended  import JWTManager, jwt_required
+from auth                import auth_bp                         # 登录/注册蓝图
+
+# ── Internal project modules ────────────────────────────────────────────────
+from molecule_annotate   import get_compounds, get_smarts_smiles
+from file_upload         import upload_file
+from molecule_convert    import convert_molecule
+from molecule_visualize  import MoleculeVisualizer
+from molecule_similarity import similarity_search
+import substructure_annotate
+from substructure_annotate import init_db, DB_PATH
+
+# ────────────────────────────────────────────────────────────────────────────
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):  return int(obj)
+        if isinstance(obj, np.floating): return float(obj)
+        if isinstance(obj, np.ndarray):  return obj.tolist()
+        return super().default(obj)
+
+# ── Flask initialisation ────────────────────────────────────────────────────
+app = Flask(__name__)
+app.config.update(
+    SECRET_KEY                   = "REPLACE_ME",
+    JWT_SECRET_KEY               = "REPLACE_ME_TOO",
+    JWT_ACCESS_TOKEN_EXPIRES     = 60 * 60 * 24 * 7  # 7 days
+)
+
+
+CORS(app, resources={
+    r"/api/*":                {"origins": "*"},
+    r"/data/*":               {"origins": "*"},
+    r"/get_molecule_image/*": {"origins": "*"}
+})
+# CORS（Bearer‑token 方式，无需 cookie）
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+
+
+# crypto / JWT
+bcrypt = Bcrypt(app)
+jwt    = JWTManager(app)
+
+# 注册登录/验证码蓝图
+app.register_blueprint(auth_bp, url_prefix="/api")
+
+visualizer    = MoleculeVisualizer(data_dir="data")
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "data")
+
+# ════════════════════════════════  ROUTES  ══════════════════════════════════
+# ----------------------------------------------------------------------------
+# File upload & static download (登录后才允许)
+# ----------------------------------------------------------------------------
+@app.route("/api/upload", methods=["POST"])
+@jwt_required()
+def handle_upload():
+    return upload_file()
+
+@app.route("/data/<filename>")
+def serve_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
+# ----------------------------------------------------------------------------
+# list sub‑structures  (需要登录)
+# ----------------------------------------------------------------------------
+@app.route("/api/substructures", methods=["GET"])
+@jwt_required()
+def list_substructures():
+    try:
+        init_db()
+        mol_id = request.args.get("molecule_id")
+
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cur  = conn.cursor()
+
+        sql = (
+            "SELECT id, molecule_id, smiles, "
+            "highlighted_atoms, highlighted_bonds, "
+            "highlight_smarts, annotation_text, timestamp "
+            "FROM molecule_substructures "
+        )
+        params = ()
+        if mol_id:
+            sql += "WHERE molecule_id=? "
+            params = (mol_id,)
+        sql += "ORDER BY timestamp DESC"
+
+        cur.execute(sql, params)
+        rows = []
+        for r in cur.fetchall():
+            d = dict(r)
+            d["atoms"] = json.loads(d.pop("highlighted_atoms")  or "[]")
+            d["bonds"] = json.loads(d.pop("highlighted_bonds") or "[]")
+            rows.append(d)
+
+        conn.close()
+        return jsonify(success=True, substructures=rows)
+
+    except Exception as e:
+        print("list_substructures error:", e)
+        return jsonify(success=False, error=str(e)), 500
+
+# ----------------------------------------------------------------------------
+# Similarity search  (保持开放，如要保护再加 jwt_required)
+# ----------------------------------------------------------------------------
+@app.route("/api/similarity_search", methods=["POST"])
+def handle_similarity_search():
+    try:
+        req = request.get_json()
+        query_smiles      = req.get("query_smiles")
+        similarity_method = req.get("similarity_metric")
+        filename          = req.get("filename")
+
+        if not query_smiles or not filename:
+            return jsonify(success=False,
+                           error="query_smiles and filename are required"), 400
+
+        df = similarity_search(query_smiles, filename, similarity_method)
+        if df.empty:
+            return jsonify(success=False, error="No matching compounds found"), 404
+
+        return app.response_class(
+            response=json.dumps({"success": True,
+                                 "results": df.to_dict("records")},
+                                cls=NumpyEncoder),
+            status=200,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        return jsonify(success=False, error=str(e)), 500
+
+# ----------------------------------------------------------------------------
+# Save highlighted fragment + annotation
+# ----------------------------------------------------------------------------
+@app.route("/api/annotate_molecule", methods=["POST"])
+@jwt_required()
+def handle_annotate_molecule():
+    """
+    Body JSON fields:
+        smiles      – parent molecule SMILES  (required)
+        atoms       – list[int] selected atoms
+        bonds       – list[int] selected bonds
+        id          – molecule_id (frontend)
+        annotation  – free‑text comment
+    """
+    try:
+        req          = request.get_json()
+        mol_smiles   = req.get("smiles")
+        atom_indices = req.get("atoms", [])
+        bond_indices = req.get("bonds", [])
+        mol_id       = req.get("id")
+        annotation   = req.get("annotation", "")
+
+        if not mol_smiles or not atom_indices:
+            return jsonify(success=False,
+                           message="Missing SMILES or atom indices"), 400
+
+        frag_smiles, frag_smarts = get_smarts_smiles(mol_smiles,
+                                                     atom_indices,
+                                                     bond_indices)
+
+        result = substructure_annotate.save_substructure(
+            mol_id, mol_smiles,
+            atom_indices, bond_indices,
+            frag_smiles, frag_smarts,
+            annotation
+        )
+
+        status = 200 if result.get("success") else 400
+        return jsonify(result), status
+
+    except Exception as e:
+        return jsonify(success=False, message=str(e)), 400
+
+# ----------------------------------------------------------------------------
+# Misc endpoints below（保持原样）
+# ----------------------------------------------------------------------------
+@app.route("/api/convert_molecule",  methods=["POST"]) 
+def handle_convert_molecule():  return convert_molecule()
+@app.route("/api/compounds",         methods=["GET"])       
+def handle_get_compounds():     return get_compounds()
+@app.route("/get_molecule_image/<cmpd_id>", methods=["GET"])
+def handle_visualize(cmpd_id):
+    try:
+        filename = request.args.get("filename")
+        if not filename:
+            return jsonify(success=False, error="Missing filename"), 400
+        return jsonify(visualizer.process_request(cmpd_id, filename))
+    except Exception as e:
+        return jsonify(success=False, error=str(e)), 500
+
+@app.route("/api/get_molecule_highlights", methods=["GET"])
+@jwt_required()
+def handle_get_molecule_highlights():
+    try:
+        mol_id   = request.args.get("id")
+        filename = request.args.get("filename", "")
+
+        if not mol_id:
+            return jsonify(success=False, message="id is required"), 400
+
+        return jsonify(substructure_annotate.get_molecule_highlights(mol_id, filename))
+    except Exception as e:
+        return jsonify(success=False, message=str(e)), 500
+>>>>>>> 2c86fda (Initial commit on update1)
 
 
 @app.route('/api/match_smarts', methods=['POST'])
@@ -343,6 +562,7 @@ def handle_match_multiple_smarts():
             "message": str(e)
         }), 500
 
+<<<<<<< HEAD
 # @app.route('/api/substructure_search', methods=['POST'])
 # def substructure_search():
 #     """
@@ -491,6 +711,8 @@ def handle_match_multiple_smarts():
 #     except Exception as e:
 #         print(f"Substructure search error: {str(e)}")
 #         return jsonify({"success": False, "error": f"Substructure search failed: {str(e)}"}), 500
+=======
+>>>>>>> 2c86fda (Initial commit on update1)
 
 @app.route('/api/substructure_search', methods=['POST'])
 def substructure_search():
