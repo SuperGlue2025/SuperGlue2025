@@ -122,7 +122,7 @@ If everything is working properly, the terminal will display information similar
 ## User Guide
 
 SuperGlue is designed to be user-friendly, allowing users to easily navigate and utilize its features.  
-[User Guide](docs/USER_GUIDE.md) provides detailed instructions on how to use the application, including uploading datasets, visualizing molecular structures, and performing different actions.
+The [User Guide](docs/USER_GUIDE.md) provides detailed instructions on how to use the application, including uploading datasets, visualizing molecular structures, and performing different actions.
 
 ## Usage
 
