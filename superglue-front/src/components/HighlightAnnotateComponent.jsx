@@ -2,10 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button, List, Typography, Divider, Empty, message, Select } from 'antd';
 import { SearchOutlined, EditOutlined, DeleteOutlined, SortAscendingOutlined } from '@ant-design/icons';
 import PropTypes from 'prop-types';
-<<<<<<< HEAD
-=======
 import { apiFetch } from '../api';
->>>>>>> 2c86fda (Initial commit on update1)
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -32,11 +29,7 @@ const HighlightAnnotateComponent = ({
   const loadSavedHighlights = async () => {
     try {
       // Fetch data from the backend API
-<<<<<<< HEAD
-      const response = await fetch(`http://localhost:5001/api/get_molecule_highlights?id=${moleculeId}&filename=${filename || ''}`, {
-=======
       const response = await apiFetch(`/api/get_molecule_highlights?id=${moleculeId}&filename=${filename || ''}`, {
->>>>>>> 2c86fda (Initial commit on update1)
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -68,11 +61,7 @@ const HighlightAnnotateComponent = ({
   const handleDeleteHighlight = async (highlightId, e) => {
     if (e) e.stopPropagation();
     try {
-<<<<<<< HEAD
-      const response = await fetch(`http://localhost:5001/api/delete_highlight`, {
-=======
       const response = await apiFetch(`/api/delete_highlight`, {
->>>>>>> 2c86fda (Initial commit on update1)
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
@@ -245,11 +234,7 @@ const HighlightAnnotateComponent = ({
 
 // PropTypes for validation
 HighlightAnnotateComponent.propTypes = {
-<<<<<<< HEAD
-  moleculeId: PropTypes.string.isRequired,
-=======
   moleculeId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
->>>>>>> 2c86fda (Initial commit on update1)
   filename: PropTypes.string,
   onHighlightSelect: PropTypes.func,
   onPerformSubstructureMatch: PropTypes.func,
