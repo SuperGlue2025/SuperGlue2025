@@ -109,6 +109,8 @@ const MoleculeIndex = () => {
   const smilesColumn = location.state?.smilesColumn || "SMILES";
   const filename = location.state?.filename;
 
+  //admet properties
+  const [admetResults, setAdmetResults] = useState(null);
 
   const initializeKetcher = () => {
     const ketcherFrame = iframeRef.current;
@@ -338,6 +340,38 @@ const MoleculeIndex = () => {
       console.error('Error getting selected substructure:', error);
       message.error('Failed to get selected substructure');
       return null;
+    }
+  };
+
+  // calculate admet properties
+
+  const fetchAdmetAndNavigate = async () => {
+    const smiles = await getSmiles();
+    if (!smiles) return;
+  
+    try {
+      const response = await apiFetch('/api/predict_admet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ smiles })
+      });
+  
+      const result = await response.json();
+      if (response.ok && result.success) {
+        navigate('/admet-result', {
+          state: {
+            smiles: smiles,
+            predictions: result.predictions // or result.data
+          }
+        });
+      } else {
+        throw new Error(result.message || 'Prediction failed');
+      }
+    } catch (error) {
+      console.error('Error predicting ADMET:', error);
+      message.error('Failed to calculate ADMET properties');
     }
   };
 
@@ -1073,8 +1107,8 @@ const substructureColumns = [
             <Menu.Item key="similarity" icon={<FileSearchOutlined />} onClick={() => handleSidebarAction('similarity')}>
               Similarity Search
             </Menu.Item>
-            <Menu.Item key="compute" icon={<CalculatorOutlined />} onClick={() => handleSidebarAction('compute')}>
-              Compute
+            <Menu.Item key="Properties" icon={<CalculatorOutlined />} onClick={() => handleSidebarAction('compute')}>
+              Properties
             </Menu.Item>
             <Menu.Item key="export" icon={<HighlightOutlined />} onClick={() => handleSidebarAction('export')}>
               View Highlights
@@ -1433,7 +1467,7 @@ const substructureColumns = [
                 {selectedTab === 'compute' && (
                   <Card title="Calculated Properties">
                     <div style={{ marginBottom: '10px' }}>
-                      <Button type="primary" size="small" onClick={getSmiles}>
+                      <Button type="primary" size="small" onClick={fetchAdmetAndNavigate}>
                         Calculate Properties
                       </Button>
                     </div>

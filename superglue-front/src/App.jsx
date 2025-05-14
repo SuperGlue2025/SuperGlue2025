@@ -8,6 +8,7 @@ import { apiFetch }    from "./api";
 
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import AdmetResult from "./components/admetResults";
 
 /* ------------------------------------------------------------------ */
 /*  App                                                               */
@@ -534,6 +535,14 @@ const App = () => {
           element={
             <Protected>
               <MyStructures />
+            </Protected>
+          }
+        />
+        <Route
+          path="/admet-result"
+          element={
+            <Protected>
+              <AdmetResult />
             </Protected>
           }
         />

@@ -11,7 +11,7 @@ from rdkit.Chem import AllChem
 
 from flask_bcrypt        import Bcrypt
 from flask_jwt_extended  import JWTManager, jwt_required
-from auth                import auth_bp                         # 登录/注册蓝图
+from auth                import auth_bp                      
 
 # ── Internal project modules ────────────────────────────────────────────────
 from molecule_annotate   import get_compounds, get_smarts_smiles
@@ -21,6 +21,7 @@ from molecule_visualize  import MoleculeVisualizer
 from molecule_similarity import similarity_search
 import substructure_annotate
 from substructure_annotate import init_db, DB_PATH
+from admet_predict import predict_admet
 
 # ────────────────────────────────────────────────────────────────────────────
 class NumpyEncoder(json.JSONEncoder):
@@ -39,20 +40,23 @@ app.config.update(
 )
 
 
-CORS(app, resources={
-    r"/api/*":                {"origins": "*"},
-    r"/data/*":               {"origins": "*"},
-    r"/get_molecule_image/*": {"origins": "*"}
+CORS(app, supports_credentials=True, resources={
+    r"/api/*": {
+        "origins": "http://localhost:5173"
+    },
+    r"/data/*": {
+        "origins": "http://localhost:5173"
+    },
+    r"/get_molecule_image/*": {
+        "origins": "http://localhost:5173"
+    }
 })
-# CORS（Bearer‑token 方式，无需 cookie）
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 
 # crypto / JWT
 bcrypt = Bcrypt(app)
 jwt    = JWTManager(app)
 
-# 注册登录/验证码蓝图
 app.register_blueprint(auth_bp, url_prefix="/api")
 
 visualizer    = MoleculeVisualizer(data_dir="data")
@@ -60,7 +64,7 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "data")
 
 # ════════════════════════════════  ROUTES  ══════════════════════════════════
 # ----------------------------------------------------------------------------
-# File upload & static download (登录后才允许)
+# File upload & static download 
 # ----------------------------------------------------------------------------
 @app.route("/api/upload", methods=["POST"])
 @jwt_required()
@@ -72,7 +76,7 @@ def serve_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 # ----------------------------------------------------------------------------
-# list sub‑structures  (需要登录)
+# list sub‑structures  
 # ----------------------------------------------------------------------------
 @app.route("/api/substructures", methods=["GET"])
 @jwt_required()
@@ -113,7 +117,7 @@ def list_substructures():
         return jsonify(success=False, error=str(e)), 500
 
 # ----------------------------------------------------------------------------
-# Similarity search  (保持开放，如要保护再加 jwt_required)
+# Similarity search  
 # ----------------------------------------------------------------------------
 @app.route("/api/similarity_search", methods=["POST"])
 def handle_similarity_search():
@@ -184,9 +188,7 @@ def handle_annotate_molecule():
     except Exception as e:
         return jsonify(success=False, message=str(e)), 400
 
-# ----------------------------------------------------------------------------
-# Misc endpoints below（保持原样）
-# ----------------------------------------------------------------------------
+
 @app.route("/api/convert_molecule",  methods=["POST"]) 
 def handle_convert_molecule():  return convert_molecule()
 @app.route("/api/compounds",         methods=["GET"])       
@@ -696,6 +698,27 @@ def convert_to_3d():
             'success': False,
             'error': f'Error occurred during conversion: {str(e)}'
         })
+    
+@app.route('/api/predict_admet', methods=['POST'])
+def handle_predict_admet():
+    try:
+        data = request.get_json()
+        smiles = data.get('smiles')
+
+        if not smiles:
+            return jsonify({'success': False, 'message': 'SMILES is required'}), 400
+
+        if isinstance(smiles, str):
+            smiles = [smiles]
+
+        predictions_df = predict_admet(smiles)
+        predictions = predictions_df.to_dict(orient='records')
+
+        return jsonify({'success': True, 'predictions': predictions}), 200
+
+    except Exception as e:
+        print(f"ADMET prediction failed: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
