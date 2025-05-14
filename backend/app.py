@@ -1,6 +1,6 @@
 from flask import Flask,send_from_directory,jsonify,request
 from flask_cors import CORS
-from molecule_annotate import get_compounds, get_smarts_smiles
+from molecule_annotate import get_compounds, get_smarts_smiles, auto_complete_ring_bonds
 from file_upload import upload_file
 from molecule_convert import convert_molecule
 from molecule_visualize import MoleculeVisualizer
@@ -90,6 +90,61 @@ def handle_similarity_search():
             "error": str(e)
         }), 500
 
+# @app.route('/api/annotate_molecule', methods=['POST'])
+# def handle_annotate_molecule():
+#     try:
+#         request_data = request.get_json()
+#         print(f"Received data: {json.dumps(request_data, cls=NumpyEncoder)}")
+#
+#         # Extract parameters
+#         mol_smiles = request_data.get('smiles')
+#         atom_indices = request_data.get('atoms', [])
+#         bond_indices = request_data.get('bonds', [])
+#         filename = request_data.get('filename')
+#         id = request_data.get('id')
+#         annotation_text = request_data.get('annotation', '')  # Get annotation text
+#
+#         # Validate required parameters
+#         if not mol_smiles or not atom_indices:
+#             print("Error: Missing required parameters")
+#             return jsonify({
+#                 "success": False,
+#                 "message": "Missing required data: SMILES or atom indices"
+#             }), 400
+#
+#         try:
+#             # Get SMARTS and SMILES for the fragment
+#             mol = Chem.MolFromSmiles(mol_smiles)
+#             bond_indices = auto_complete_ring_bonds(mol, atom_indices, bond_indices)
+#             fragment_smiles, fragment_smarts = get_smarts_smiles(mol_smiles, atom_indices, bond_indices)
+#             print(f"补全后的 bond_indices: {bond_indices}")
+#             # Save to database with annotation
+#             result = substructure_annotate.save_substructure(
+#                 id,
+#                 mol_smiles,
+#                 atom_indices,
+#                 bond_indices,
+#                 fragment_smiles,
+#                 fragment_smarts,
+#                 annotation_text  # Add annotation text to save function
+#             )
+#
+#             if result.get("success"):
+#                 return jsonify(result)
+#             else:
+#                 print(f"Error in save_substructure: {result}")
+#                 return jsonify(result), 400
+#
+#         except Exception as e:
+#             print(f"Error processing molecular data: {str(e)}")
+#             return jsonify({
+#                 "success": False,
+#                 "message": f"Error processing molecular data: {str(e)}"
+#             }), 400
+#
+#     except Exception as e:
+#         print(f"Error processing request: {str(e)}")
+#         return jsonify({"success": False, "message": str(e)}), 400
 @app.route('/api/annotate_molecule', methods=['POST'])
 def handle_annotate_molecule():
     try:
@@ -98,6 +153,7 @@ def handle_annotate_molecule():
 
         # Extract parameters
         mol_smiles = request_data.get('smiles')
+        molfile = request_data.get('molfile')
         atom_indices = request_data.get('atoms', [])
         bond_indices = request_data.get('bonds', [])
         filename = request_data.get('filename')
@@ -105,16 +161,28 @@ def handle_annotate_molecule():
         annotation_text = request_data.get('annotation', '')  # Get annotation text
 
         # Validate required parameters
-        if not mol_smiles or not atom_indices:
+        if not molfile or not atom_indices:
             print("Error: Missing required parameters")
             return jsonify({
                 "success": False,
-                "message": "Missing required data: SMILES or atom indices"
+                "message": "Missing required data: molfile or atom indices"
             }), 400
 
         try:
-            # Get SMARTS and SMILES for the fragment
-            fragment_smiles, fragment_smarts = get_smarts_smiles(mol_smiles, atom_indices, bond_indices)
+            # Restore molecule object from molfile
+            mol = Chem.MolFromMolBlock(molfile)
+            if mol is None:
+                print("Error: Invalid molfile")
+                return jsonify({
+                    "success": False,
+                    "message": "Invalid molfile"
+                }), 400
+
+            # Auto-complete ring bonds
+            bond_indices = auto_complete_ring_bonds(mol, atom_indices, bond_indices)
+
+            # Generate fragment_smiles, fragment_smarts
+            fragment_smiles, fragment_smarts = get_smarts_smiles(mol, atom_indices, bond_indices)
 
             # Save to database with annotation
             result = substructure_annotate.save_substructure(
@@ -343,155 +411,6 @@ def handle_match_multiple_smarts():
             "message": str(e)
         }), 500
 
-# @app.route('/api/substructure_search', methods=['POST'])
-# def substructure_search():
-#     """
-#     Perform substructure search.
-#     Request parameters:
-#     - query_smiles: SMILES of the current molecule
-#     - query_id: molecule ID
-#     - atoms: list of selected atoms
-#     - bonds: list of selected bonds
-#     - filename: name of the CSV file
-#     """
-#     try:
-#         # Get request parameters
-#         data = request.json
-#         query_smiles = data.get('query_smiles')
-#         query_id = data.get('query_id')
-#         atoms = data.get('atoms', [])
-#         bonds = data.get('bonds', [])
-#         filename = data.get('filename', '')
-#
-#         if not query_smiles:
-#             return jsonify({"success": False, "error": "Missing query SMILES"}), 400
-#
-#         if not atoms or len(atoms) == 0:
-#             return jsonify({"success": False, "error": "No substructure (atoms) selected"}), 400
-#
-#         # Define data directory
-#         data_dir = os.path.join(os.path.dirname(__file__), 'data')
-#         csv_path = os.path.join(data_dir, filename)
-#
-#         # Check if highlights for this molecule already exist in the database
-#         highlights_result = substructure_annotate.get_molecule_highlights(query_id, filename)
-#
-#         fragment_smarts = None
-#         fragment_smiles = None
-#         db_result = False
-#
-#         if highlights_result.get('success') and 'highlights' in highlights_result:
-#             # Try to find a highlight that matches the selected atoms
-#             for highlight in highlights_result['highlights']:
-#                 highlight_atoms = highlight.get('atoms', [])
-#                 if sorted(highlight_atoms) == sorted(atoms):
-#                     fragment_smarts = highlight.get('fragment_smarts')
-#                     fragment_smiles = highlight.get('fragment_smiles')
-#                     db_result = True
-#                     print(f"SMARTS retrieved from DB: {fragment_smarts}")
-#                     break
-#
-#         # If not found in DB, compute a new SMARTS pattern
-#         if not fragment_smarts:
-#             print("No matching substructure found in DB. Generating new SMARTS pattern.")
-#             fragment_smiles, fragment_smarts = get_smarts_smiles(query_smiles, atoms, bonds)
-#
-#             if not fragment_smarts:
-#                 return jsonify({"success": False, "error": "Failed to generate SMARTS pattern"}), 400
-#
-#         # Check if the CSV file exists
-#         if not os.path.exists(csv_path):
-#             return jsonify({"success": False, "error": f"File not found: {filename}"}), 404
-#
-#         # Create substructure pattern
-#         pattern = Chem.MolFromSmarts(fragment_smarts)
-#         if not pattern:
-#             return jsonify({"success": False, "error": "Failed to create substructure pattern"}), 400
-#         # Read CSV
-#         try:
-#             df = pd.read_csv(csv_path)
-#         except Exception as e:
-#             return jsonify({"success": False, "error": f"Failed to read CSV: {str(e)}"}), 500
-#
-#         # Detect SMILES column
-#         smiles_column = None
-#         possible_smiles_columns = ['SMILES', 'smiles', 'Smiles', 'smile', 'SMILE']
-#         for col in possible_smiles_columns:
-#             if col in df.columns:
-#                 smiles_column = col
-#                 break
-#
-#         if not smiles_column:
-#             return jsonify({"success": False, "error": "SMILES column not found in CSV"}), 400
-#
-#         # Detect ID column
-#         id_column = None
-#         possible_id_columns = ['ID', 'id', 'cmpd_id', 'Compound_ID', 'compound_id', 'molecule_id']
-#         for col in possible_id_columns:
-#             if col in df.columns:
-#                 id_column = col
-#                 break
-#
-#         if not id_column:
-#             id_column = df.columns[0]  # Use the first column as fallback
-#
-#         # Perform substructure search
-#         matches = []
-#
-#         for _, row in df.iterrows():
-#             smiles = row[smiles_column]
-#             try:
-#                 mol = Chem.MolFromSmiles(smiles)
-#
-#                 if mol and mol.HasSubstructMatch(pattern):
-#                     result = {
-#                         "id": str(row[id_column]),
-#                         "smiles": smiles,
-#                         "fragment_smarts": fragment_smarts,
-#                         "fragment_smiles": fragment_smiles
-#                     }
-#
-#                     for col in df.columns:
-#                         if col not in [id_column, smiles_column]:
-#                             result[col] = row[col]
-#
-#                     matches.append(result)
-#             except Exception as e:
-#                 print(f"Error processing molecule {row[id_column]}: {str(e)}")
-#                 continue
-#
-#         # Save new substructure to DB if not already stored
-#         if not db_result and len(matches) > 0:
-#             try:
-#                 save_result = substructure_annotate.save_substructure(
-#                     query_id,
-#                     query_smiles,
-#                     atoms,
-#                     bonds,
-#                     fragment_smiles,
-#                     fragment_smarts,
-#                     f"Auto-saved substructure query - matched {len(matches)} compounds"
-#                 )
-#                 print(f"New substructure saved to DB: {save_result}")
-#             except Exception as e:
-#                 print(f"Error saving substructure to DB: {str(e)}")
-#
-#         return jsonify({
-#             "success": True,
-#             "results": matches,
-#             "fragment_smarts": fragment_smarts,
-#             "fragment_smiles": fragment_smiles,
-#             "query_id": query_id,
-#             "selected_atoms": atoms,
-#             "selected_bonds": bonds,
-#             "from_database": db_result,
-#             "matches_count": len(matches)
-#         })
-#
-#     except Exception as e:
-#         print(f"Substructure search error: {str(e)}")
-#         return jsonify({"success": False, "error": f"Substructure search failed: {str(e)}"}), 500
-
 @app.route('/api/substructure_search', methods=['POST'])
 def substructure_search():
     """Perform an exact substructure match search without saving results to the database."""
@@ -503,7 +422,7 @@ def substructure_search():
         atoms = data.get('atoms', [])
         bonds = data.get('bonds', [])
         filename = data.get('filename', '')
-
+        molfile = data.get('molfile')
         print(f"\n===== Substructure Search Started =====")
         print(f"Query ID: {query_id}")
         print(f"Selected atoms: {atoms}")
@@ -511,6 +430,8 @@ def substructure_search():
 
         if not query_smiles:
             return jsonify({"success": False, "error": "Missing query SMILES"}), 400
+        if not molfile:
+            return jsonify({"success": False, "error": "Missing molfile"}), 400
 
         if not atoms or len(atoms) == 0:
             return jsonify({"success": False, "error": "No substructure (atoms) selected"}), 400
@@ -527,7 +448,6 @@ def substructure_search():
         db_result = False
 
         if highlights_result.get('success') and 'highlights' in highlights_result:
-            # Try to find a highlight that matches the selected atoms
             for highlight in highlights_result['highlights']:
                 highlight_atoms = highlight.get('atoms', [])
                 if sorted(highlight_atoms) == sorted(atoms):
@@ -537,11 +457,13 @@ def substructure_search():
                     print(f"SMARTS retrieved from database: {fragment_smarts}")
                     break
 
-        # If not found in the database, generate a new SMARTS pattern
         if not fragment_smarts:
             print("No matching substructure found in database. Generating new SMARTS pattern.")
-            fragment_smiles, fragment_smarts = get_smarts_smiles(query_smiles, atoms, bonds)
-
+            mol = Chem.MolFromMolBlock(molfile)
+            if mol is None:
+                return jsonify({"success": False, "error": "Invalid molfile"}), 400
+            bonds = auto_complete_ring_bonds(mol, atoms, bonds)
+            fragment_smiles, fragment_smarts = get_smarts_smiles(mol, atoms, bonds)
             if not fragment_smarts:
                 return jsonify({"success": False, "error": "Failed to generate SMARTS pattern"}), 400
 
@@ -823,5 +745,59 @@ def convert_to_3d():
             'error': f'Error occurred during conversion: {str(e)}'
         })
 
+
+@app.route('/api/optimize_structure', methods=['POST'])
+def optimize_structure():
+    try:
+        data = request.json
+        molfile = data.get('molfile')
+        smiles = data.get('smiles', '')
+        use_smiles = data.get('use_smiles', False)
+
+        mol = None
+
+        # 决定使用哪种方法生成3D结构
+        if use_smiles and smiles:
+            # 优先使用SMILES生成3D结构
+            mol = Chem.MolFromSmiles(smiles)
+            if mol:
+                # 添加氢原子
+                mol = Chem.AddHs(mol)
+                # 生成3D坐标
+                AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+        else:
+            # 使用SDF文件
+            # 首先检查SDF是否已包含3D坐标
+            mol = Chem.MolFromMolBlock(molfile)
+
+            # 检查是否有3D坐标
+            if mol:
+                conf = mol.GetConformer()
+                has_3d = not conf.Is2D()
+
+                if not has_3d:
+                    # 如果只有2D坐标，需要生成3D坐标
+                    mol = Chem.AddHs(mol)
+                    AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+
+        if mol is None:
+            return jsonify({'success': False, 'error': '无法解析分子结构'})
+
+        # 执行能量最小化优化
+        AllChem.MMFFOptimizeMolecule(mol)
+
+        # 转换回SDF格式
+        optimized_sdf = Chem.MolToMolBlock(mol)
+
+        return jsonify({
+            'success': True,
+            'optimized_sdf': optimized_sdf
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

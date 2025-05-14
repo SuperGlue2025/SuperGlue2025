@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Card, Button, Select, Row, Col, message, Space } from 'antd';
+import { Card, Button, Select, Row, Col, message, Space, Upload } from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
-// Simplified molecular viewer component, integrating Ketcher 2D and 3Dmol 3D view
+// Enhanced molecular viewer component with SDF file support
 const SimpleMoleculeViewer = ({ ketcher, ketcherPath }) => {
   const viewerRef = useRef(null);
   const ketcherRef = useRef(null);
@@ -11,6 +12,8 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath }) => {
   const [viewStyle, setViewStyle] = useState('stick');
   const [isLoading, setIsLoading] = useState(false);
   const [currentSmiles, setCurrentSmiles] = useState('');
+  const [sdfContent, setSdfContent] = useState('');
+  const [moleculeLoaded, setMoleculeLoaded] = useState(false); // Track if molecule is loaded
 
   // Initialize 3Dmol.js
   useEffect(() => {
@@ -42,7 +45,7 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath }) => {
     };
   }, []);
 
-  // Initialize 3D viewer
+  // Initialize 3D viewer with an empty scene
   const initViewer = () => {
     try {
       if (window.$3Dmol) {
@@ -53,6 +56,9 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath }) => {
 
         if (viewerInstance) {
           setViewer(viewerInstance);
+
+          // Just initialize the viewer without any molecule
+          viewerInstance.render();
         }
       } else {
         console.error('3Dmol library failed to load');
@@ -64,7 +70,7 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath }) => {
     }
   };
 
-  // Get current SMILES from Ketcher and update 3D molecule
+  // Get current structure from Ketcher and update 3D molecule
   const updateMoleculeFrom2D = async () => {
     const ketcherInstance = ketcher || (ketcherRef.current ? ketcherRef.current.contentWindow?.ketcher : null);
 
@@ -75,52 +81,136 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath }) => {
 
     try {
       setIsLoading(true);
-      const currentSmiles = await ketcherInstance.getSmiles();
 
-      if (!currentSmiles) {
+      // First try to get structure as SDF/Molfile
+      let molfile = await ketcherInstance.getMolfile();
+
+      if (!molfile || molfile.trim() === '') {
         message.warning('No molecule to visualize');
         setIsLoading(false);
         return;
       }
 
-      setCurrentSmiles(currentSmiles);
+      // Also get SMILES
+      const smiles = await ketcherInstance.getSmiles();
+      setCurrentSmiles(smiles);
 
-      // Call backend API to convert SMILES to 3D structure
-      const response = await fetch('http://localhost:5001/api/convert_to_3d', {
+      // Call backend API to perform structure conversion and optimization
+      const response = await fetch('http://localhost:5001/api/optimize_structure', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ smiles: currentSmiles })
+        body: JSON.stringify({
+          molfile: molfile,
+          smiles: smiles,
+          use_smiles: true // Tell backend to prefer SMILES method for 3D conversion
+        })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to convert molecule to 3D structure');
+        throw new Error('Failed to optimize and convert molecule structure');
       }
 
       const data = await response.json();
 
-      if (data.success && data.molblock && viewer) {
-        // Clear current model
-        viewer.clear();
-
-        // Add new 3D molecule
-        viewer.addModel(data.molblock, 'mol');
-
-        // Apply view style
-        applyViewStyle(viewStyle);
-
-        // Zoom and render
-        viewer.zoomTo();
-        viewer.render();
+      if (data.success && data.optimized_sdf && viewer) {
+        // Use the optimized SDF returned from the server
+        displaySdfStructure(data.optimized_sdf);
       } else {
-        throw new Error(data.error || 'Failed to generate 3D structure');
+        throw new Error(data.error || 'Failed to generate optimized 3D structure');
       }
     } catch (error) {
       console.error('Error updating 3D molecule:', error);
       message.error('Error visualizing 3D molecule: ' + error.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+
+  // Handle SDF file upload and use it directly for 3D visualization
+  const handleSdfUpload = (file) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const content = e.target.result;
+      setSdfContent(content);
+
+      try {
+        setIsLoading(true);
+
+        // Option 1: Display SDF directly if it already has 3D coordinates
+        // This attempts to display the SDF without optimization
+        try {
+          displaySdfStructure(content);
+          // If successfully displayed, we're done
+          setIsLoading(false);
+          return;
+        } catch (e) {
+          console.log('Direct SDF display failed, will try server optimization', e);
+          // Continue to server-side optimization
+        }
+
+        // Option 2: Send to server for optimization
+        const response = await fetch('http://localhost:5001/api/optimize_structure', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            molfile: content,
+            use_smiles: false // Tell backend to use the SDF file directly
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to optimize SDF structure');
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.optimized_sdf) {
+          displaySdfStructure(data.optimized_sdf);
+        } else {
+          throw new Error(data.error || 'Failed to optimize SDF structure');
+        }
+      } catch (error) {
+        console.error('Error processing SDF file:', error);
+        message.error('Error processing SDF file: ' + error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    reader.readAsText(file);
+    return false; // Prevent default upload behavior
+  };
+
+  // Display SDF structure directly in the 3D viewer
+  const displaySdfStructure = (sdfData) => {
+    if (!viewer || !sdfData) {
+      return;
+    }
+
+    try {
+      // Clear current model
+      viewer.clear();
+
+      // Add SDF model directly to viewer (SDF already contains 3D coordinates)
+      viewer.addModel(sdfData, 'sdf');
+
+      // Apply view style
+      applyViewStyle(viewStyle);
+
+      // Zoom and render
+      viewer.zoomTo();
+      viewer.render();
+
+      setMoleculeLoaded(true); // Update state to indicate molecule is loaded
+      message.success('3D structure loaded successfully');
+    } catch (error) {
+      console.error('Error displaying SDF structure:', error);
+      message.error('Failed to display 3D structure');
     }
   };
 
@@ -157,23 +247,30 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath }) => {
     }
   };
 
-  // Try to get SMILES if external ketcher is provided
-  useEffect(() => {
-    if (ketcher) {
-      try {
-        ketcher.getSmiles().then(smiles => {
-          if (smiles) {
-            setCurrentSmiles(smiles);
-          }
-        });
-      } catch (error) {
-        console.error('Error getting SMILES from Ketcher:', error);
-      }
-    }
-  }, [ketcher]);
+  // Try to get structure if external ketcher is provided - now this is commented out to prevent auto-loading
+  // useEffect(() => {
+  //   if (ketcher) {
+  //     try {
+  //       ketcher.getMolfile().then(molfile => {
+  //         if (molfile && molfile.trim() !== '') {
+  //           // Try to visualize directly if it has 3D coordinates
+  //           try {
+  //             if (viewer) {
+  //               displaySdfStructure(molfile);
+  //             }
+  //           } catch (e) {
+  //             console.log('Direct visualization failed, may need conversion', e);
+  //           }
+  //         }
+  //       });
+  //     } catch (error) {
+  //       console.error('Error getting structure from Ketcher:', error);
+  //     }
+  //   }
+  // }, [ketcher, viewer]);
 
   return (
-    <Card title="3D Viewer">
+    <Card title="3D Molecule Viewer">
       <Row gutter={16}>
         {/* 3Dmol.js 3D viewer */}
         <Col span={24}>
@@ -185,9 +282,25 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath }) => {
               position: 'relative',
               border: '1px solid #ddd',
               borderRadius: '4px',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: '#f9f9f9'
             }}
           >
+            {!moleculeLoaded && !isLoading && (
+              <div style={{
+                color: '#888',
+                fontSize: '16px',
+                textAlign: 'center',
+                position: 'absolute',
+                zIndex: 1
+              }}>
+                No molecule loaded. Use buttons below to load a 3D structure.
+              </div>
+            )}
+
             {isLoading && (
               <div style={{
                 position: 'absolute',
@@ -216,13 +329,32 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath }) => {
           {/* 3D viewer controls */}
           <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
             <Space>
-              <Button type="primary" onClick={updateMoleculeFrom2D} loading={isLoading}>
-                3D
+              <Button
+                type="primary"
+                onClick={updateMoleculeFrom2D}
+                loading={isLoading}
+                title="Convert current 2D structure to 3D using SMILES"
+              >
+                SMILES to 3D
               </Button>
+              <Upload
+                beforeUpload={handleSdfUpload}
+                showUploadList={false}
+                accept=".sdf,.mol"
+              >
+                <Button
+                  icon={<UploadOutlined />}
+                  loading={isLoading}
+                  title="Load a 3D structure from SDF file"
+                >
+                  Load SDF
+                </Button>
+              </Upload>
               <Select
                 value={viewStyle}
                 onChange={handleViewStyleChange}
                 style={{ width: 160 }}
+                disabled={!moleculeLoaded} // Disable style selector if no molecule is loaded
               >
                 <Option value="stick">Stick Model</Option>
                 <Option value="sphere">Sphere Model</Option>

@@ -297,11 +297,20 @@ const MoleculeIndex = () => {
         console.error('Error getting SMILES:', error);
       }
 
+      let molfile = '';
+      try {
+        molfile = await ketcherInstance.getMolfile();
+        setKetcherMolfile(molfile);
+      } catch (error) {
+        console.error('Error getting molfile:', error);
+      }
+
       const highlightData = {
         compoundId: moleculeName || moleculeId || `Compound-${moleculeIdFromParams}`,
         highlightedAtoms: atoms,
         highlightedBonds: bonds,
         smiles: smiles,
+        molfile: molfile,
         timestamp: new Date().toISOString()
       };
 
@@ -375,6 +384,7 @@ const MoleculeIndex = () => {
         id: moleculeId,
         filename: filename || '',
         smiles: highlightData.smiles,
+        molfile: highlightData.molfile || ketcherMolfile,
         atoms: highlightData.highlightedAtoms,
         bonds: highlightData.highlightedBonds,
         annotation: annotation
@@ -747,9 +757,10 @@ const MoleculeIndex = () => {
       setSubstructureError('');
 
       const smiles = await ketcher.getSmiles();
-
+      const molfile = await ketcher.getMolfile();
       const payload = {
         query_smiles: smiles,
+        molfile: molfile,
         query_id: moleculeName || moleculeId || `Compound-${moleculeIdFromParams}`,
         atoms: atoms,
         bonds: bonds,

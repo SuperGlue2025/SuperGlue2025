@@ -46,7 +46,7 @@ def save_substructure(molecule_id, smiles, highlighted_atoms, highlighted_bonds=
         atoms_json = json.dumps(highlighted_atoms)
         bonds_json = json.dumps(highlighted_bonds) if highlighted_bonds else None
         timestamp = datetime.now().isoformat()
-
+        print(f"存入数据库的 bond_indices: {highlighted_bonds}")
         cursor.execute('''
         INSERT INTO molecule_substructures
         (molecule_id, smiles, highlighted_atoms, highlighted_bonds, highlight_smiles, highlight_smarts, annotation_text, timestamp)
