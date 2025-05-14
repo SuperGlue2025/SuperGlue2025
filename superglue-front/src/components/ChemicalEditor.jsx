@@ -1230,7 +1230,10 @@ const substructureColumns = [
           >
 
             <Menu.Item key="annotate" icon={<CommentOutlined />} onClick={() => handleSidebarAction('annotate')}>
-              Annotate
+              Annotate/Highlight
+            </Menu.Item>
+             <Menu.Item key="export" icon={<HighlightOutlined />} onClick={() => handleSidebarAction('export')}>
+              View Highlights
             </Menu.Item>
             <Menu.Item key="similarity" icon={<FileSearchOutlined />} onClick={() => handleSidebarAction('similarity')}>
               Similarity Search
@@ -1238,9 +1241,7 @@ const substructureColumns = [
             <Menu.Item key="compute" icon={<CalculatorOutlined />} onClick={() => handleSidebarAction('compute')}>
               Compute
             </Menu.Item>
-            <Menu.Item key="export" icon={<HighlightOutlined />} onClick={() => handleSidebarAction('export')}>
-              View Highlights
-            </Menu.Item>
+
 
             <Menu.Item key="modify" icon={<ClusterOutlined />} onClick={() => handleSidebarAction('modify')}>
               3D Visualization
