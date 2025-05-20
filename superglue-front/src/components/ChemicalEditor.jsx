@@ -56,6 +56,9 @@ const MoleculeIndex = () => {
   const [similarityMethod, setSimilarityMethod] = useState('tanimoto');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMethod, setSearchMethod] = useState('');
+  const [resultColumns, setResultColumns] = useState([]);
+  const [substructureColumns, setSubstructureColumns] = useState([]);
+
 
   // Get dynamic molecule properties
   const [moleculeProperties, setMoleculeProperties] = useState({});
@@ -107,6 +110,8 @@ const MoleculeIndex = () => {
   const smilesColumn = location.state?.smilesColumn || "SMILES";
   const filename = location.state?.filename;
 
+  const [is3dModeActive, setIs3dModeActive] = useState(false);
+  const [didAttemptLoad3d, setDidAttemptLoad3d] = useState(0);
   // log
   useEffect(() => {
     console.log("URL Parameter ID:", id);
@@ -591,119 +596,7 @@ const MoleculeIndex = () => {
       }
     }
   };
-  // applyMultipleHighlights function with better color handling
 
-  // const applyMultipleHighlights = async (highlights) => {
-  //   if (!ketcher || !ketcher.editor) {
-  //     return;
-  //   }
-  //
-  //   try {
-  //     // First clear existing highlights
-  //     ketcher.editor.highlights.clear();
-  //
-  //     if (!highlights || highlights.length === 0) {
-  //       return;
-  //     }
-  //
-  //     // Define color palette for different highlights
-  //     const colors = [
-  //       '#FF0000', // Bright Red
-  //       '#00CC00', // Green
-  //       '#0066FF', // Blue
-  //       '#FF9900', // Orange
-  //       '#9900CC', // Purple
-  //       '#00CCCC', // Teal
-  //       '#FF66CC', // Pink
-  //       '#FFCC00', // Yellow
-  //       '#669900', // Olive
-  //       '#FF3366', // Rose
-  //       '#006666', // Dark Teal
-  //       '#993300'  // Brown
-  //     ];
-  //
-  //     // Get current molecule structure
-  //     const molecule = ketcher.editor.render.ctab.molecule;
-  //
-  //     // Prepare highlight configurations for each highlight
-  //     const highlightConfigs = [];
-  //     const legendItems = [];
-  //
-  //     for (let i = 0; i < highlights.length; i++) {
-  //       const highlight = highlights[i];
-  //       const atoms = highlight.atoms || [];
-  //
-  //       // Skip if no atoms to highlight
-  //       if (atoms.length === 0) continue;
-  //
-  //       // Get bonds from the highlight or calculate them
-  //       let bonds = highlight.bonds || [];
-  //
-  //       // If we have atoms but no bonds, infer the bonds from the current molecule
-  //       if (atoms.length > 0 && bonds.length === 0 && molecule && molecule.bonds) {
-  //         bonds = molecule.bonds
-  //           .map((bond, index) => ({
-  //             index,
-  //             begin: bond.begin,
-  //             end: bond.end
-  //           }))
-  //           .filter(bond =>
-  //             atoms.includes(bond.begin) && atoms.includes(bond.end)
-  //           )
-  //           .map(bond => bond.index);
-  //       }
-  //
-  //       // Select color for this highlight
-  //       const colorIndex = i % colors.length;
-  //       const color = colors[colorIndex];
-  //
-  //       // Add to highlight configs
-  //       highlightConfigs.push({
-  //         atoms: atoms,
-  //         bonds: bonds,
-  //         color: color
-  //       });
-  //
-  //       // Add to legend
-  //       const annotationText = highlight.annotation ? ` - ${highlight.annotation}` : '';
-  //       legendItems.push(`<span style="color:${color}">●</span> highlight ${i + 1}${annotationText}`);
-  //     }
-  //
-  //     // Apply all highlights
-  //     if (highlightConfigs.length > 0) {
-  //       ketcher.editor.highlights.create(...highlightConfigs);
-  //
-  //       // Show success message with color legend
-  //       const legendHtml = `<div>${legendItems.join('<br/>')}</div>`;
-  //
-  //       notification.success({
-  //         message: `showing ${highlightConfigs.length} highlights`,
-  //         description: (
-  //           <div dangerouslySetInnerHTML={{ __html: legendHtml }} />
-  //         ),
-  //         duration: 5
-  //       });
-  //     } else {
-  //       message.warning('no matching highlights');
-  //     }
-  //   } catch (error) {
-  //     console.error('multiple higlights error:', error);
-  //   }
-  // };
-
-  // const navigateHighlights = (direction) => {
-  //   if (savedHighlights.length === 0) return;
-  //
-  //   let newIndex;
-  //   if (direction === 'next') {
-  //     newIndex = currentHighlightIndex < savedHighlights.length - 1 ? currentHighlightIndex + 1 : 0;
-  //   } else {
-  //     newIndex = currentHighlightIndex > 0 ? currentHighlightIndex - 1 : savedHighlights.length - 1;
-  //   }
-  //
-  //   setCurrentHighlightIndex(newIndex);
-  //   applyHighlight(savedHighlights[newIndex]);
-  // };
 
   // Return to last page
   const handleBack = () => {
@@ -716,12 +609,27 @@ const MoleculeIndex = () => {
 
   // Handle sidebar actions
   const handleSidebarAction = (action) => {
+    // First, update the currently selected tab
     setSelectedTab(action);
+    // If switching to 3D view, update the state accordingly
+    if (action === 'modify') {
+      console.log('Activating 3D visualization mode');
+      setIs3dModeActive(true);
 
+      // Increment counter to force component reload
+      setDidAttemptLoad3d(prev => prev + 1);
+      console.log(`Incrementing 3D load counter to ${didAttemptLoad3d + 1}`);
+    } else {
+      // If switching to other tabs
+      setIs3dModeActive(false);
+    }
+
+    // If switching to compute tab, fetch current SMILES
     if (action === 'compute') {
       getSmiles();
     }
 
+    // If switching to similarity search, fetch SMILES then show panel
     if (action === 'similarity') {
       getSmiles().then(() => {
         setSimilaritySearchVisible(true);
@@ -730,7 +638,8 @@ const MoleculeIndex = () => {
       setSimilaritySearchVisible(false);
       setShowResultsTable(false);
     }
-  };
+};
+
 
   // Use the current apply highlight as a substructure
   const performSubstructureMatching = async () => {
@@ -743,13 +652,12 @@ const MoleculeIndex = () => {
         return;
       }
 
-      // Get current highlight
       const currentHighlight = savedHighlights[currentHighlightIndex];
       const atoms = currentHighlight.atoms || [];
       const bonds = currentHighlight.bonds || [];
 
       if (atoms.length === 0) {
-        message.warning('There is no atoms in current highlight.');
+        message.warning('There are no atoms in the current highlight.');
         return;
       }
 
@@ -777,7 +685,7 @@ const MoleculeIndex = () => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`server error: ${response.status}. ${errorText}`);
+        throw new Error(`Server error: ${response.status}. ${errorText}`);
       }
 
       const data = await response.json();
@@ -789,64 +697,53 @@ const MoleculeIndex = () => {
           smiles: result.smiles || result.SMILES || '',
           fragment_smarts: result.fragment_smarts || '',
           fragment_smiles: result.fragment_smiles || '',
-          ...result // other properties
+          ...result
         }));
 
         setSubstructureResults(formattedResults);
+        setSubstructureColumns(generateSubstructureColumns(formattedResults));
         setShowSubstructureResults(true);
-        message.success(`find ${formattedResults.length} matching molecules`);
+        message.success(`Found ${formattedResults.length} matching molecules`);
 
         if (data.fragment_smarts) {
           message.info(`SMARTS: ${data.fragment_smarts}`);
         }
       } else {
-        throw new Error(data.error || '未找到匹配的化合物');
+        throw new Error(data.error || 'No matching compounds found');
       }
     } catch (error) {
-      console.error('substructure searching error:', error);
+      console.error('Substructure searching error:', error);
       setSubstructureError(error.message);
-      message.error(`searching erro: ${error.message}`);
+      message.error(`Search error: ${error.message}`);
     } finally {
       setIsLoadingSubstructure(false);
     }
-  };
+};
 
-  // fetch molecule SVG
-  // const fetchMoleculeSvg = async (smiles) => {
-  //   try {
-  //     const response = await fetch(`http://localhost:5001/api/get_molecule_svg`, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json'
-  //       },
-  //       body: JSON.stringify({ smiles })
-  //     });
-  //
-  //     if (!response.ok) {
-  //       throw new Error(`Failed to fetch SVG: ${response.status}`);
-  //     }
-  //
-  //     const data = await response.json();
-  //     if (data.success && data.svg) {
-  //       setMoleculeSvg(data.svg);
-  //     } else {
-  //       throw new Error(data.error || 'Could not generate SVG');
-  //     }
-  //   } catch (error) {
-  //     console.error('Error fetching molecule SVG:', error);
-  //     message.error(`Could not load molecule image: ${error.message}`);
-  //   }
-  // };
 // fetch molecule SVG
-
-const fetchMoleculeSvg = async (smiles, fragment_smarts = null) => {
+const fetchMoleculeSvg = async (smiles, fragment_smarts = null, match_data = null) => {
   try {
+    // Construct the request body
     const requestBody = {
       smiles: smiles,
       fragment_smarts: fragment_smarts
     };
 
-    console.log("请求SVG生成:", requestBody);
+    // If match data is provided, add it to the request
+    if (match_data && typeof match_data === 'object') {
+      if (Array.isArray(match_data.match_atoms)) {
+        requestBody.match_atoms = match_data.match_atoms;
+      }
+      if (Array.isArray(match_data.match_bonds)) {
+        requestBody.match_bonds = match_data.match_bonds;
+      }
+    }
+    // For backward compatibility, keep highlight_bonds parameter
+    else if (Array.isArray(match_data)) {
+      requestBody.highlight_bonds = match_data;
+    }
+
+    console.log("Requesting SVG generation:", requestBody);
 
     const response = await fetch(`http://localhost:5001/api/get_molecule_svg`, {
       method: 'POST',
@@ -871,153 +768,112 @@ const fetchMoleculeSvg = async (smiles, fragment_smarts = null) => {
     message.error(`Could not load molecule image: ${error.message}`);
   }
 };
-  // Columns for the substructure results table
-  // const substructureColumns = [
-  //   {
-  //     title: 'Cmpd Id',
-  //     dataIndex: 'cmpd_id',
-  //     key: 'cmpd_id',
-  //   },
-  //   {
-  //     title: 'SMILES',
-  //     dataIndex: 'smiles',
-  //     key: 'smiles',
-  //     ellipsis: true,
-  //     render: smiles => (
-  //       <div style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-  //         {smiles}
-  //       </div>
-  //     )
-  //   },
-  //   // -------Add more property columns--------
-  //   {
-  //     title: 'Actions',
-  //     key: 'actions',
-  //     render: (_, record) => (
-  //       <Space>
-  //         <Button size="small" onClick={() => {
-  //           setSelectedMolecule(record);
-  //           fetchMoleculeSvg(record.smiles);
-  //         }}>
-  //           View
-  //         </Button>
-  //       </Space>
-  //     ),
-  //   },
-  // ];
-  // Updated substructureColumns with improved View button handler
-const substructureColumns = [
-  {
-    title: 'Cmpd Id',
-    dataIndex: 'cmpd_id',
-    key: 'cmpd_id',
-  },
-  {
-    title: 'SMILES',
-    dataIndex: 'smiles',
-    key: 'smiles',
-    ellipsis: true,
-    render: smiles => (
-      <div style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {smiles}
-      </div>
-    )
-  },
 
-{
-  title: 'Actions',
-  key: 'actions',
-  render: (_, record) => (
-    <Space>
-      <Button size="small" onClick={() => {
-        setSelectedMolecule(record);
 
-        // Always use SMARTS pattern for highlighting if available
-        if (record.fragment_smarts) {
-          console.log(`Highlighting using SMARTS: ${record.fragment_smarts}`);
-          fetchMoleculeSvg(record.smiles, record.fragment_smarts);
-        } else {
-          console.log(`No SMARTS available, displaying molecule without highlight`);
-          fetchMoleculeSvg(record.smiles);
-        }
-      }}>
-        View
-      </Button>
-    </Space>
-  ),
-},
-
-];
-
-  // Handle similarity search results
   const handleSimilarityResults = (results, method) => {
+    // Print debug info
+    console.log("Received similarity results:", {
+      resultsCount: results?.length || 0,
+      method,
+      firstResultSample: results && results.length > 0
+        ? Object.keys(results[0]).slice(0, 5).reduce((obj, key) => {
+            obj[key] = results[0][key];
+            return obj;
+          }, {})
+        : 'No results'
+    });
+
+    // Ensure results are a valid array
+    if (!results || !Array.isArray(results) || results.length === 0) {
+      console.error("Invalid or empty results received:", results);
+      message.error("Invalid or empty search results received");
+      return;
+    }
+
     setSimilarityResults(results);
     setOriginalResults(results); // Store original results for filtering
     setShowResultsTable(true);
-    setSearchMethod(method);
+    setSearchMethod(method || 'unknown');
     setFiltersActive(false);
     setActiveFilters({});
 
-    // Extract actual min/max for each property and prepare ranges for filter initialization
-    const ranges = {};
-    const propertiesToCheck = ['similarity', 'binary_occ', 'cont_occ', 'low_gsh_prob', 'med_gsh_prob', 'high_gsh_prob', 'selectivity'];
+    // Generate dynamic columns for the result table
+    setResultColumns(generateDynamicResultColumns(results));
 
-    propertiesToCheck.forEach(prop => {
-      const values = results
-        .map(result => result[prop])
-        .filter(val => val !== undefined && val !== null && !isNaN(val));
+    // Extract value ranges for filterable properties
+    try {
+      // Identify numeric properties from the first result
+      const propertiesToCheck = Object.keys(results[0]).filter(prop => {
+        const val = results[0][prop];
+        return (
+          typeof val === 'number' ||
+          (typeof val === 'string' && !isNaN(parseFloat(val)))
+        );
+      });
 
-      if (values.length > 0) {
-        // Calculate actual min and max
-        const min = Math.min(...values);
-        const max = Math.max(...values);
+      console.log("Filterable properties:", propertiesToCheck);
 
-        // Add small buffer to max value (5% of range) to ensure values at max are included
-        const buffer = (max - min) * 0.05;
-        const adjustedMax = max + buffer;
+      // Compute min and max for each property
+      const ranges = {};
+      propertiesToCheck.forEach(prop => {
+        const values = results
+          .map(result => result[prop])
+          .filter(val => val !== undefined && val !== null && !isNaN(val))
+          .map(val => (typeof val === 'string' ? parseFloat(val) : val));
 
-        // Store the range
-        ranges[prop] = [min, adjustedMax];
-        console.log(`Property ${prop} range: [${min}, ${adjustedMax}]`);
-      }
-    });
+        if (values.length > 0) {
+          const min = Math.min(...values);
+          const max = Math.max(...values);
+          const buffer = (max - min) * 0.05;
+          const adjustedMax = max + (buffer || 0.1); // Ensure range isn't zero
+          ranges[prop] = [min, adjustedMax];
+        }
+      });
 
-    getSmiles().then(smiles => {
-      setSearchQuery(smiles || currentSmiles);
-    });
+      console.log("Calculated property ranges:", ranges);
+    } catch (error) {
+      console.error("Error calculating property ranges:", error);
+    }
+
+    // Get the current SMILES string
+    getSmiles()
+      .then(smiles => {
+        setSearchQuery(smiles || currentSmiles);
+      })
+      .catch(err => {
+        console.error("Error getting SMILES:", err);
+        setSearchQuery(currentSmiles);
+      });
   };
 
-  // Handle filter application
-  const handleApplyFilters = (filters) => {
+
+
+   const handleApplyFilters = (filters) => {
     setIsSearching(true);
     setActiveFilters(filters);
     setFiltersActive(true);
 
     try {
-      // Get the enabled filters
       const enabledFilterKeys = Object.keys(filters);
 
-      // Update enabled filters state
       const newEnabledFilters = {};
       Object.keys(enabledFilters).forEach(key => {
         newEnabledFilters[key] = enabledFilterKeys.includes(key);
       });
       setEnabledFilters(newEnabledFilters);
 
-      // Apply filters to the original results
       const filteredResults = originalResults.filter(result => {
-        // Check each enabled filter
         return enabledFilterKeys.every(property => {
           const value = result[property];
           const range = filters[property];
-          // Safety check for undefined or null values
           return value !== undefined && value !== null && !isNaN(value) &&
-                 value >= range[0] && value <= range[1];
+                value >= range[0] && value <= range[1];
         });
       });
 
-      // Update the results table
       setSimilarityResults(filteredResults);
+      setResultColumns(generateDynamicResultColumns(filteredResults));
+
       message.success(`Applied filters: Found ${filteredResults.length} results`);
     } catch (error) {
       console.error('Error applying filters:', error);
@@ -1025,26 +881,27 @@ const substructureColumns = [
     } finally {
       setIsSearching(false);
     }
-  };
-
+};
 
   // Handle clearing filters
-  const handleClearFilters = () => {
+   const handleClearFilters = () => {
     setFiltersActive(false);
     setActiveFilters({});
-    setEnabledFilters({
-      similarity: true,
-      binary_occ: false,
-      cont_occ: false,
-      low_gsh_prob: false,
-      med_gsh_prob: false,
-      high_gsh_prob: false,
-      selectivity: false
-    });
-    // Restore original search results
+
+    if (originalResults.length > 0) {
+      const newEnabledFilters = {};
+      Object.keys(originalResults[0]).forEach(key => {
+        newEnabledFilters[key] = key.toLowerCase() === 'similarity';
+      });
+      setEnabledFilters(newEnabledFilters);
+    }
+
     setSimilarityResults(originalResults);
+    setResultColumns(generateDynamicResultColumns(originalResults));
+
     message.info('Filters cleared');
-  };
+};
+
 
   // Format property values
   const formatPropertyValue = (value) => {
@@ -1085,8 +942,9 @@ const substructureColumns = [
     return {};
   };
 
-// Results table columns with filter indicators
-  const resultColumns = [
+ //Implementation of the base column generator for similarity results
+const getBaseResultColumns = () => {
+  return [
     {
       title: 'Cmpd Id',
       dataIndex: 'cmpd_id',
@@ -1106,112 +964,225 @@ const substructureColumns = [
       sorter: (a, b) => a.similarity - b.similarity,
       render: value => (value * 100).toFixed(1) + '%',
       defaultSortOrder: 'descend',
+    }
+  ];
+};
+
+// Implementation for dynamic generation of similarity search columns
+const generateDynamicResultColumns = (results) => {
+  if (!results || results.length === 0) {
+    return getBaseResultColumns();
+  }
+
+  const columnsToShow = [...getBaseResultColumns()];
+  const excludedFields = ['cmpd_id', 'similarity', 'key', 'smiles', 'molfile', 'structure'];
+  const allKeys = Object.keys(results[0]);
+
+  allKeys.forEach(key => {
+    if (!excludedFields.includes(key.toLowerCase())) {
+      const sampleValue = results[0][key];
+      const isNumeric = typeof sampleValue === 'number' ||
+                      (typeof sampleValue === 'string' && !isNaN(parseFloat(sampleValue)));
+
+      columnsToShow.push({
+        title: (
+          <span>
+            {key}
+            {filtersActive && activeFilters[key] && (
+              <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
+            )}
+          </span>
+        ),
+        dataIndex: key,
+        key: key,
+        sorter: isNumeric ? (a, b) => {
+          const aVal = typeof a[key] === 'number' ? a[key] : parseFloat(a[key]);
+          const bVal = typeof b[key] === 'number' ? b[key] : parseFloat(b[key]);
+          return aVal - bVal;
+        } : undefined,
+        render: value => {
+          if (value === null || value === undefined) return '-';
+          if (isNumeric) {
+            return typeof value === 'number' ? value.toFixed(2) : parseFloat(value).toFixed(2);
+          }
+          return value;
+        },
+        ellipsis: true,
+      });
+    }
+  });
+
+  // Add actions column
+  // columnsToShow.push({
+  //   title: 'Actions',
+  //   key: 'actions',
+  //   render: (_, record) => (
+  //     <Space>
+  //       <Button size="small" onClick={() => {
+  //         if (ketcher) {
+  //           try {
+  //             ketcher.setMolecule(record.smiles);
+  //           } catch (error) {
+  //             console.error('Error loading molecule:', error);
+  //           }
+  //         }
+  //       }}>
+  //         View
+  //       </Button>
+  //     </Space>
+  //   ),
+  // }
+  //);
+
+  return columnsToShow;
+};
+
+// Implementation for dynamic generation of substructure search columns
+const generateSubstructureColumns = (results) => {
+  if (!results || results.length === 0) {
+    return [
+      {
+        title: 'Cmpd Id',
+        dataIndex: 'cmpd_id',
+        key: 'cmpd_id',
+      },
+      {
+        title: 'SMILES',
+        dataIndex: 'smiles',
+        key: 'smiles',
+        ellipsis: true,
+        render: smiles => (
+          <div style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {smiles}
+          </div>
+        )
+      },
+      // {
+      //   title: 'Actions',
+      //   key: 'actions',
+      //   render: (_, record) => (
+      //     <Space>
+      //       <Button size="small" onClick={() => {
+      //         setSelectedMolecule(record);
+      //         const matchData = {
+      //           match_atoms: record.match_atoms || [],
+      //           match_bonds: record.match_bonds || []
+      //         };
+      //         fetchMoleculeSvg(record.smiles, record.fragment_smarts, matchData);
+      //       }}>
+      //         View
+      //       </Button>
+      //     </Space>
+      //   ),
+      // }
+    ];
+  }
+
+  // baseColumns
+  const baseColumns = [
+    {
+      title: 'Cmpd Id',
+      dataIndex: 'cmpd_id',
+      key: 'cmpd_id',
     },
     {
-      title: (
-        <span>
-          Binary Occ
-          {filtersActive && activeFilters.binary_occ && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'binary_occ',
-      key: 'binary_occ',
-      sorter: (a, b) => a.binary_occ - b.binary_occ,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
-      title: (
-        <span>
-          Cont Occ
-          {filtersActive && activeFilters.cont_occ && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'cont_occ',
-      key: 'cont_occ',
-      sorter: (a, b) => a.cont_occ - b.cont_occ,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
-      title: (
-        <span>
-          Low Gsh Prob
-          {filtersActive && activeFilters.low_gsh_prob && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'low_gsh_prob',
-      key: 'low_gsh_prob',
-      sorter: (a, b) => a.low_gsh_prob - b.low_gsh_prob,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
-      title: (
-        <span>
-          Med Gsh Prob
-          {filtersActive && activeFilters.med_gsh_prob && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'med_gsh_prob',
-      key: 'med_gsh_prob',
-      sorter: (a, b) => a.med_gsh_prob - b.med_gsh_prob,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
-      title: (
-        <span>
-          High Gsh Prob
-          {filtersActive && activeFilters.high_gsh_prob && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'high_gsh_prob',
-      key: 'high_gsh_prob',
-      sorter: (a, b) => a.high_gsh_prob - b.high_gsh_prob,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
-      title: (
-        <span>
-          Selectivity
-          {filtersActive && activeFilters.selectivity && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'selectivity',
-      key: 'selectivity',
-      sorter: (a, b) => a.selectivity - b.selectivity,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button size="small" onClick={() => {
-            if (ketcher) {
-              try {
-                ketcher.setMolecule(record.smiles);
-              } catch (error) {
-                console.error('Error loading molecule:', error);
-              }
-            }
-          }}>
-            View
-          </Button>
-        </Space>
-      ),
-    },
+      title: 'SMILES',
+      dataIndex: 'smiles',
+      key: 'smiles',
+      ellipsis: true,
+      render: smiles => (
+        <div style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {smiles}
+        </div>
+      )
+    }
   ];
 
+  // Exclude these fields from table columns – enhanced exclusion logic
+  const excludedFields = [
+    // Basic fields
+    'cmpd_id', 'key', 'smiles', 'molfile', 'structure',
+    'fragment_smarts', 'fragment_smiles', 'match_atoms', 'match_bonds',
+
+    // Variants of common ID fields – ensure all potential duplicate ID fields are excluded
+    'id', 'compound_id', 'molecule_id', 'mol_id', 'compound', 'molecule',
+    'compound_name', 'molecule_name', 'name', 'identifier'
+  ];
+
+  // Dynamic columns
+  const dynamicColumns = [];
+
+
+  // Get all keys from the first result as potential columns
+  const allKeys = Object.keys(results[0]);
+
+  // Create column config for each eligible property
+  allKeys.forEach(key => {
+    // Check if this field should be excluded:
+    // 1. Exact match with the exclusion list
+    // 2. Contains 'id' but is not a specific ID-related field that we want to keep
+    const shouldExclude =
+      excludedFields.includes(key.toLowerCase()) ||
+      (key.toLowerCase().includes('id') &&
+       !key.toLowerCase().includes('activity') &&
+       !key.toLowerCase().includes('valid') &&
+       !key.toLowerCase().includes('grid'));
+
+    if (!shouldExclude) {
+      // Determine the value type of the property
+      const sampleValue = results[0][key];
+      const isNumeric = typeof sampleValue === 'number' ||
+                        (typeof sampleValue === 'string' && !isNaN(parseFloat(sampleValue)));
+
+      // Create the column configuration
+      dynamicColumns.push({
+        title: key,
+        dataIndex: key,
+        key: key,
+        // Use a numeric sorter if applicable
+        sorter: isNumeric ? (a, b) => {
+          const aVal = typeof a[key] === 'number' ? a[key] : parseFloat(a[key]);
+          const bVal = typeof b[key] === 'number' ? b[key] : parseFloat(b[key]);
+          return aVal - bVal;
+        } : undefined,
+        // Format the display based on data type
+        render: value => {
+          if (value === null || value === undefined) return '-';
+          if (isNumeric) {
+            return typeof value === 'number' ? value.toFixed(2) : parseFloat(value).toFixed(2);
+          }
+          return value;
+        },
+        // Set column style
+        ellipsis: true,
+        width: key.length > 10 ? 150 : 120,
+      });
+    }
+  });
+
+
+  // Action column
+  const actionsColumn = {
+    title: 'Actions',
+    key: 'actions',
+    render: (_, record) => (
+      <Space>
+        <Button size="small" onClick={() => {
+          setSelectedMolecule(record);
+          const matchData = {
+            match_atoms: record.match_atoms || [],
+            match_bonds: record.match_bonds || []
+          };
+          fetchMoleculeSvg(record.smiles, record.fragment_smarts, matchData);
+        }}>
+          View
+        </Button>
+      </Space>
+    ),
+  };
+
+  return [...baseColumns, ...dynamicColumns, actionsColumn];
+};
   const ketcherPath = window.location.origin + '/standalone/index.html';
 
   return (
@@ -1347,6 +1318,9 @@ const substructureColumns = [
                   <SimpleMoleculeViewer
                     ketcher={ketcher}
                     ketcherPath={ketcherPath}
+                    moleculeId={moleculeName || moleculeId || `Compound-${moleculeIdFromParams || Date.now()}`}
+                    isActive={is3dModeActive}
+                    key={`3d-view-${didAttemptLoad3d}`} // 数字计数器作为key，确保组件重新挂载
                   />
                 </div>
               )}
@@ -1364,17 +1338,17 @@ const substructureColumns = [
                     <div style={{ display: 'flex', height: '400px' }}>
                       {/* Results table taking 2/3 of space */}
                       <div style={{ flex: 2, marginRight: '12px', overflowY: 'auto' }}>
-                        <Table
-                          columns={substructureColumns}
-                          dataSource={substructureResults}
-                          size="small"
-                          pagination={{
-                            pageSize: 10,
-                            showSizeChanger: true,
-                            pageSizeOptions: ['5', '10', '20']
-                          }}
-                          scroll={{ y: 320 }}
-                        />
+                         <Table
+                            columns={substructureColumns}
+                            dataSource={substructureResults}
+                            size="small"
+                            pagination={{
+                              pageSize: 10,
+                              showSizeChanger: true,
+                              pageSizeOptions: ['5', '10', '20']
+                            }}
+                            scroll={{ y: 320 }}
+                          />
                       </div>
 
                       {/* Molecule visualization area taking 1/3 of space */}

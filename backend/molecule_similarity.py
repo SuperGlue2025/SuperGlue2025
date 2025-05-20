@@ -49,9 +49,10 @@ def similarity_search(query_smiles, filename, similarity_metric='Tanimoto'):
     query_fp = gen.GetFingerprint(query_mol)
 
     results = []
+    dataset_df.columns = [col.lower() for col in dataset_df.columns]
     # Iterate through the dataset and compute similarity
     for _, row in dataset_df.iterrows():
-        target_smiles = row.get("SMILES")
+        target_smiles = row.get("smiles")
         target_id = row.get("cmpd_id")
 
         # Convert target SMILES to RDKit molecule
