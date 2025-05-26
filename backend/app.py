@@ -2,12 +2,20 @@
 import json, os, sqlite3, traceback
 from datetime import datetime
 
+import seaborn as sns
+
+
 import numpy as np
 import pandas as pd
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from rdkit import Chem
 from rdkit.Chem import AllChem
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from io import BytesIO
+from flask import send_file
 
 from flask_bcrypt        import Bcrypt
 from flask_jwt_extended  import JWTManager, jwt_required
@@ -22,6 +30,7 @@ from molecule_similarity import similarity_search
 import substructure_annotate
 from substructure_annotate import init_db, DB_PATH
 from admet_predict import predict_admet
+from admet_plot import make_density_plot
 
 # ────────────────────────────────────────────────────────────────────────────
 class NumpyEncoder(json.JSONEncoder):
@@ -40,17 +49,14 @@ app.config.update(
 )
 
 
-CORS(app, supports_credentials=True, resources={
-    r"/api/*": {
-        "origins": "http://localhost:5173"
-    },
-    r"/data/*": {
-        "origins": "http://localhost:5173"
-    },
-    r"/get_molecule_image/*": {
-        "origins": "http://localhost:5173"
-    }
-})
+CORS(app,
+     supports_credentials=True,
+     resources={
+         r"/api/.*": {"origins": "*"},
+         r"/data/.*": {"origins": "*"},
+         r"/get_molecule_image/.*": {"origins": "*"}
+     })
+
 
 
 # crypto / JWT
@@ -719,6 +725,81 @@ def handle_predict_admet():
     except Exception as e:
         print(f"ADMET prediction failed: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
+    
+@app.route('/api/admet_plot', methods=['POST'])
+def handle_admet_plot():
+    """
+    Given JSON { smiles: [...], property: "<property_name>" },
+    generate a density plot comparing DrugBank vs. a single compound value,
+    and return it as image/png.
+    """
+    data = request.get_json(force=True)
+    smiles_list   = data.get('smiles', [])
+    property_name = data.get('property')
+    if not smiles_list or not property_name:
+        return jsonify({"success": False, "message": "smiles & property must"}), 400
+
+    try:
+        preds_df = predict_admet(smiles_list)  
+    except Exception as e:
+        return jsonify({"success": False, "message": f"error: {e}"}), 500
+
+    import admet_ai
+    pkg_dir = os.path.dirname(admet_ai.__file__)
+    drugbank_csv = None
+    for root, _, files in os.walk(pkg_dir):
+        for fn in files:
+            if 'drugbank' in fn.lower() and fn.endswith('.csv'):
+                drugbank_csv = os.path.join(root, fn)
+                break
+        if drugbank_csv:
+            break
+
+    if drugbank_csv:
+        drugbank_df = pd.read_csv(drugbank_csv)
+    else:
+        drugbank_df = pd.DataFrame()
+
+    # 3)
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    # 3.1 DrugBank KDE
+    if property_name in drugbank_df.columns and drugbank_df[property_name].dropna().shape[0] >= 2:
+        sns.kdeplot(
+            drugbank_df[property_name].dropna(),
+            ax=ax,
+            label='DrugBank',
+            color='gray',
+            fill=True,
+            alpha=0.3,
+            bw_method=0.3
+        )
+
+    if property_name in preds_df.columns and not preds_df[property_name].isna().all():
+        user_val = float(preds_df[property_name].iloc[0])
+        ax.axvline(
+            user_val,
+            color='blue',
+            linestyle='--',
+            linewidth=2,
+            label='Your Compound'
+        )
+    else:
+        return jsonify({"success": False, "message": f"Property {property_name} not in prediction results"}), 400
+
+    ax.set_title(property_name.replace('_', ' '))
+    ax.set_xlabel(property_name.replace('_', ' '))
+    ax.set_ylabel('Density')
+    ax.legend()
+    fig.tight_layout()
+    # 4) Save the figure to a BytesIO buffer and return it as image/png
+    buf = BytesIO()
+    fig.savefig(buf, format='png', dpi=150)
+    plt.close(fig)
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png')
+
+        
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
