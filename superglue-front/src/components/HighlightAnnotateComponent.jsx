@@ -9,6 +9,7 @@ const { Option } = Select;
 const HighlightAnnotateComponent = ({
   moleculeId,
   filename,
+  dataset_id,
   onHighlightSelect,
   onPerformSubstructureMatch,
   isLoadingHighlights = false
@@ -28,12 +29,13 @@ const HighlightAnnotateComponent = ({
   const loadSavedHighlights = async () => {
     try {
       // Fetch data from the backend API
-      const response = await fetch(`http://localhost:5001/api/get_molecule_highlights?id=${moleculeId}&filename=${filename || ''}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
+      const response = await fetch(
+        `http://localhost:5001/api/get_molecule_highlights?molecule_id=${moleculeId}&dataset_id=${dataset_id}`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
         }
-      });
+      );
 
       const data = await response.json();
 
@@ -68,7 +70,8 @@ const HighlightAnnotateComponent = ({
         body: JSON.stringify({
           id: moleculeId,
           highlightId: highlightId,
-          filename: filename || ''
+          filename: filename || '',
+          dataset_id: dataset_id
         })
       });
 
@@ -235,6 +238,7 @@ const HighlightAnnotateComponent = ({
 HighlightAnnotateComponent.propTypes = {
   moleculeId: PropTypes.string.isRequired,
   filename: PropTypes.string,
+  dataset_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onHighlightSelect: PropTypes.func,
   onPerformSubstructureMatch: PropTypes.func,
   isLoadingHighlights: PropTypes.bool

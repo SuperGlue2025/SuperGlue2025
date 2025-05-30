@@ -112,6 +112,9 @@ const MoleculeIndex = () => {
 
   const [is3dModeActive, setIs3dModeActive] = useState(false);
   const [didAttemptLoad3d, setDidAttemptLoad3d] = useState(0);
+
+  const dataset_id = location.state?.dataset_id;
+
   // log
   useEffect(() => {
     console.log("URL Parameter ID:", id);
@@ -392,7 +395,8 @@ const MoleculeIndex = () => {
         molfile: highlightData.molfile || ketcherMolfile,
         atoms: highlightData.highlightedAtoms,
         bonds: highlightData.highlightedBonds,
-        annotation: annotation
+        annotation: annotation,
+        dataset_id: dataset_id
       };
 
       console.log('Sending payload to server:', payload);
@@ -481,12 +485,13 @@ const MoleculeIndex = () => {
 
     setIsLoadingHighlights(true);
     try {
-      const response = await fetch(`http://localhost:5001/api/get_molecule_highlights?id=${moleculeId}&filename=${filename || ''}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
+      const response = await fetch(
+        `http://localhost:5001/api/get_molecule_highlights?id=${moleculeId}&filename=${filename || ''}&dataset_id=${dataset_id || ''}`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
         }
-      });
+      );
 
       const data = await response.json();
 
@@ -672,7 +677,8 @@ const MoleculeIndex = () => {
         query_id: moleculeName || moleculeId || `Compound-${moleculeIdFromParams}`,
         atoms: atoms,
         bonds: bonds,
-        filename: filename || ''
+        filename: filename || '',
+        dataset_id: dataset_id
       };
 
       const response = await fetch('http://localhost:5001/api/substructure_search', {
@@ -1589,11 +1595,10 @@ const generateSubstructureColumns = (results) => {
                       <HighlightAnnotateComponent
                         moleculeId={moleculeId || `Compound-${moleculeIdFromParams}`}
                         filename={filename}
+                        dataset_id={dataset_id}
                         isLoadingHighlights={isLoadingHighlights}
                         onHighlightSelect={(highlight) => {
-                          // Apply the selected highlight to the molecule
                           applyHighlight(highlight);
-                          // Set as current highlight
                           const index = savedHighlights.findIndex(h =>
                             h.id === highlight.id ||
                             (h.atoms && highlight.atoms && JSON.stringify(h.atoms) === JSON.stringify(highlight.atoms))
@@ -1623,6 +1628,7 @@ const generateSubstructureColumns = (results) => {
         onResultsFound={handleSimilarityResults}
         ketcher={ketcher}
         moleculeProperties={moleculeProperties}
+        datasetId={dataset_id}
       />
     </Layout>
   );

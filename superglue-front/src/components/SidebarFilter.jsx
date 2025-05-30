@@ -13,13 +13,13 @@ const SidebarFilter = ({
   currentSmiles,
   isLoading
 }) => {
-  // 状态变量
+  // State variables
   const [filterRanges, setFilterRanges] = useState({});
   const [activeFilters, setActiveFilters] = useState({});
   const [enabledFilters, setEnabledFilters] = useState({});
   const [filterProperties, setFilterProperties] = useState([]);
 
-  // 添加调试日志
+  // Add debug logs
   useEffect(() => {
     console.log("SidebarFilter Props:", {
       isVisible,
@@ -35,28 +35,28 @@ const SidebarFilter = ({
     }
   }, [isVisible, searchResults, currentSmiles, isLoading]);
 
-  // 从搜索结果中获取可过滤属性和范围
+  // Get filterable properties and ranges from search results
   useEffect(() => {
     if (searchResults && searchResults.length > 0) {
       console.log("Updating sidebar filter ranges from search results:", searchResults.length);
 
       try {
-        // 获取第一个结果的所有键
+        // Get all keys from the first result
         const allKeys = Object.keys(searchResults[0]);
 
-        // 排除这些字段不作为过滤器
+        // Exclude these fields from being used as filters
         const excludedFields = [
           'cmpd_id', 'key', 'smiles', 'molfile', 'structure', 'id',
           'fragment_smarts', 'fragment_smiles', 'match_atoms', 'match_bonds',
           'compound_id', 'molecule_id', 'mol_id', 'name'
         ];
 
-        // 找出所有可能的数值属性作为过滤器
+        // Find all possible numeric properties to use as filters
         const possibleFilterProps = allKeys.filter(key => {
-          // 排除基础字段和非数值字段
+          // Exclude basic fields and non-numeric fields
           if (excludedFields.includes(key.toLowerCase())) return false;
 
-          // 检查是否为数值字段
+          // Check if the field is numeric
           const sampleValue = searchResults[0][key];
           return typeof sampleValue === 'number' ||
                 (typeof sampleValue === 'string' && !isNaN(parseFloat(sampleValue)));
@@ -67,10 +67,10 @@ const SidebarFilter = ({
 
         if (possibleFilterProps.length === 0) {
           console.log("No filterable numeric properties found in results");
-          return; // 如果没有可过滤属性，提前退出
+          return; // Exit early if no filterable properties
         }
 
-        // 计算每个属性的范围
+        // Calculate the range for each property
         const ranges = {};
         const initialActiveFilters = {};
         const initialEnabledFilters = {};
@@ -82,26 +82,26 @@ const SidebarFilter = ({
             .map(val => typeof val === 'string' ? parseFloat(val) : val);
 
           if (values.length > 0) {
-            // 计算实际的最小值和最大值
+            // Calculate actual min and max values
             const min = Math.min(...values);
             const max = Math.max(...values);
 
-            // 添加小缓冲区确保最大值被包含
+            // Add a small buffer to ensure the max value is included
             const buffer = (max - min) * 0.05;
-            const adjustedMax = max + (buffer || 0.1); // 确保即使min=max也有一个范围
+            const adjustedMax = max + (buffer || 0.1); // Ensure there is a range even if min=max
 
-            // 存储范围
+            // Store the range
             ranges[prop] = [min, adjustedMax];
             initialActiveFilters[prop] = [min, adjustedMax];
 
-            // 默认启用 similarity 过滤器(如果存在)，或第一个过滤器
+            // By default, enable the similarity filter (if present), or the first filter
             initialEnabledFilters[prop] = prop.toLowerCase() === 'similarity' ||
                                         (possibleFilterProps.indexOf(prop) === 0 && !possibleFilterProps.includes('similarity'));
           }
         });
 
         if (Object.keys(ranges).length > 0) {
-          // 更新状态
+          // Update state
           setFilterRanges(ranges);
           setActiveFilters(initialActiveFilters);
           setEnabledFilters(initialEnabledFilters);
@@ -118,7 +118,7 @@ const SidebarFilter = ({
     }
   }, [searchResults]);
 
-  // 处理过滤器复选框改变
+  // Handle filter checkbox change
   const handleFilterToggle = (property) => {
     setEnabledFilters(prev => ({
       ...prev,
@@ -126,7 +126,7 @@ const SidebarFilter = ({
     }));
   };
 
-  // 处理过滤器范围改变
+  // Handle filter range change
   const handleFilterChange = (property, values) => {
     setActiveFilters(prev => ({
       ...prev,
@@ -134,13 +134,13 @@ const SidebarFilter = ({
     }));
   };
 
-  // 应用过滤器
+  // Apply filters
   const handleApplyFilters = () => {
     try {
       const filters = Object.entries(enabledFilters)
         .filter(([key, enabled]) => enabled)
         .reduce((acc, [key]) => {
-          // 确保活动过滤器中有该属性
+          // Ensure the property exists in active filters
           if (activeFilters[key]) {
             acc[key] = activeFilters[key];
           }
@@ -154,10 +154,10 @@ const SidebarFilter = ({
     }
   };
 
-  // 清除所有过滤器
+  // Clear all filters
   const handleClearFilters = () => {
     try {
-      // 重置所有启用的过滤器，只保留一个默认启用
+      // Reset all enabled filters, only keep one default enabled
       const resetEnabled = {};
       filterProperties.forEach(prop => {
         resetEnabled[prop] = prop.toLowerCase() === 'similarity' ||
@@ -166,18 +166,18 @@ const SidebarFilter = ({
 
       setEnabledFilters(resetEnabled);
 
-      // 重置活动过滤器到全范围
+      // Reset active filters to full range
       setActiveFilters({...filterRanges});
 
       console.log("Filters cleared");
-      // 调用清除回调
+      // Call clear callback
       onClearFilters();
     } catch (error) {
       console.error("Error clearing filters:", error);
     }
   };
 
-  // 格式化属性标签
+  // Format property label
   const formatLabel = (property) => {
     try {
       return property
@@ -186,18 +186,18 @@ const SidebarFilter = ({
         .join(' ');
     } catch (error) {
       console.error("Error formatting label:", error);
-      return property; // 返回原始属性名作为后备
+      return property; // Return original property as fallback
     }
   };
 
-  // 根据属性类型预定义范围步长
+  // Predefine step size based on property type
   const getStep = (property) => {
     try {
       if (property.toLowerCase() === 'similarity') return 0.01;
       if (property.toLowerCase().includes('occ')) return 0.1;
       if (property.toLowerCase().includes('prob')) return 0.01;
 
-      // 默认步长 - 根据数值范围动态确定
+      // Default step size - dynamically determined by value range
       const range = filterRanges[property];
       if (!range) return 0.01;
 
@@ -208,11 +208,11 @@ const SidebarFilter = ({
       return 0.01;
     } catch (error) {
       console.error("Error getting step:", error);
-      return 0.01; // 返回默认步长作为后备
+      return 0.01; // Return default step as fallback
     }
   };
 
-  // 格式化显示值
+  // Format display value
   const formatValue = (value, property) => {
     try {
       if (!value && value !== 0) return '-';
@@ -221,11 +221,11 @@ const SidebarFilter = ({
         return (value * 100).toFixed(0) + '%';
       }
 
-      // 判断是整数还是小数
+      // Check if integer or float
       return Number.isInteger(value) ? value.toString() : value.toFixed(2);
     } catch (error) {
       console.error("Error formatting value:", error);
-      return String(value); // 返回字符串化的值作为后备
+      return String(value); // Return stringified value as fallback
     }
   };
 
@@ -251,7 +251,7 @@ const SidebarFilter = ({
 
       <Divider style={{ margin: '12px 0' }} />
 
-      {/* 如果没有可过滤属性，显示提示信息 */}
+      {/* If there are no filterable properties, show a message */}
       {(!filterProperties || filterProperties.length === 0) ? (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <Text type="secondary">

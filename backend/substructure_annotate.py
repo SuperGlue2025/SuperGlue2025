@@ -13,37 +13,59 @@ def init_db():
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
+    # Create new table for storing dataset information
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS dataset (
+            dataset_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_name TEXT,
+            timestamp DATETIME
+        )
+    ''')
     # Create table for substructure highlights with annotation text field
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS molecule_substructures (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        molecule_id TEXT NOT NULL,
-        smiles TEXT,
-        highlighted_atoms TEXT NOT NULL,
-        highlighted_bonds TEXT,
-        highlight_smiles TEXT,
-        highlight_smarts TEXT,
-        annotation_text TEXT,
-        timestamp TEXT
-    )
+        CREATE TABLE IF NOT EXISTS molecule_substructures (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dataset_id INTEGER,
+            molecule_id TEXT NOT NULL,
+            smiles TEXT,
+            highlighted_atoms TEXT NOT NULL,
+            highlighted_bonds TEXT,
+            highlight_smiles TEXT,
+            highlight_smarts TEXT,
+            annotation_text TEXT,
+            timestamp TEXT
+        )
     ''')
     # Create new table for storing molecule ID with SDF files
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS molecule_structures (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             molecule_id TEXT NOT NULL,
+            dataset_id INTEGER,
             smiles TEXT,
             sdf_content TEXT NOT NULL,
             timestamp TEXT,
-            UNIQUE(molecule_id)  /* Ensure each molecule ID has only one structure record */
+            UNIQUE(dataset_id, molecule_id),  -- Ensure each molecule ID has only one structure record
+            FOREIGN KEY(dataset_id) REFERENCES dataset(dataset_id)
         )
-        ''')
+    ''')
+    # Create new table for storing compound information
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS compound (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dataset_id INTEGER,
+            molecule_id TEXT,
+            smiles TEXT,
+            property TEXT,
+            FOREIGN KEY(dataset_id) REFERENCES dataset(dataset_id)
+        )
+    ''')
+   
 
     conn.commit()
     conn.close()
 
-def save_substructure(molecule_id, smiles, highlighted_atoms, highlighted_bonds=None,
+def save_substructure(dataset_id, molecule_id, smiles, highlighted_atoms, highlighted_bonds=None,
                       fragment_smiles=None, fragment_smarts=None, annotation_text=None):
     """Save highlighted substructure information and annotation to database"""
     try:
@@ -57,12 +79,10 @@ def save_substructure(molecule_id, smiles, highlighted_atoms, highlighted_bonds=
         atoms_json = json.dumps(highlighted_atoms)
         bonds_json = json.dumps(highlighted_bonds) if highlighted_bonds else None
         timestamp = datetime.now().isoformat()
-        print(f"存入数据库的 bond_indices: {highlighted_bonds}")
-        cursor.execute('''
-        INSERT INTO molecule_substructures
-        (molecule_id, smiles, highlighted_atoms, highlighted_bonds, highlight_smiles, highlight_smarts, annotation_text, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (molecule_id, smiles, atoms_json, bonds_json, fragment_smiles, fragment_smarts, annotation_text, timestamp))
+        cursor.execute(
+            "INSERT INTO molecule_substructures (dataset_id, molecule_id, smiles, highlighted_atoms, highlighted_bonds, highlight_smiles, highlight_smarts, annotation_text, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (dataset_id, molecule_id, smiles, atoms_json, bonds_json, fragment_smiles, fragment_smarts, annotation_text, timestamp)
+        )
 
         substructure_id = cursor.lastrowid
         conn.commit()
@@ -86,8 +106,8 @@ def save_substructure(molecule_id, smiles, highlighted_atoms, highlighted_bonds=
             "error": str(e)
         }
 
-def get_molecule_highlights(molecule_id, filename=''):
-    """Retrieve all highlighted substructures for a specific molecule."""
+def get_molecule_highlights(molecule_id, dataset_id=None):
+    """Retrieve all highlighted substructures for a specific molecule and dataset."""
     try:
         # Ensure the database is initialized
         init_db()
@@ -99,12 +119,18 @@ def get_molecule_highlights(molecule_id, filename=''):
         conn.row_factory = sqlite3.Row  # Return results as dictionaries
         cursor = conn.cursor()
 
-        # Adjust the query based on your table schema
-        cursor.execute('''
-        SELECT * FROM molecule_substructures
-        WHERE molecule_id = ?
-        ORDER BY timestamp DESC
-        ''', (molecule_id,))
+        if dataset_id:
+            cursor.execute('''
+            SELECT * FROM molecule_substructures
+            WHERE molecule_id = ? AND dataset_id = ?
+            ORDER BY timestamp DESC
+            ''', (molecule_id, dataset_id))
+        else:
+            cursor.execute('''
+            SELECT * FROM molecule_substructures
+            WHERE molecule_id = ?
+            ORDER BY timestamp DESC
+            ''', (molecule_id,))
 
         rows = cursor.fetchall()
         conn.close()
@@ -124,8 +150,6 @@ def get_molecule_highlights(molecule_id, filename=''):
                 "annotation": row_dict.get('annotation_text', ''),
                 "timestamp": row_dict.get('timestamp')
             }
-            print(f"Constructed highlight object: {highlight}")
-
             highlights.append(highlight)
 
         return {

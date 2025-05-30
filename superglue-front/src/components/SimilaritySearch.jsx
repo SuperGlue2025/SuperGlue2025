@@ -14,7 +14,8 @@ const SimilaritySearch = ({
   onClose,
   onResultsFound,
   ketcher,
-  moleculeProperties
+  moleculeProperties,
+  datasetId
 }) => {
   const [activeTab, setActiveTab] = useState('query');
   const [similarityMethod, setSimilarityMethod] = useState('Tanimoto');
@@ -37,7 +38,7 @@ const SimilaritySearch = ({
         query_smiles: currentSmiles,
         query_id: currentId,
         similarity_metric: similarityMethod,
-        filename: filename
+        ...(datasetId ? { dataset_id: datasetId } : {})
       };
 
       console.log('Sending search request with params:', searchParams);

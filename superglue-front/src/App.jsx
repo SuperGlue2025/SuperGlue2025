@@ -103,11 +103,12 @@ const validateCSVHeaders = async (file) => {
 
     if (response.ok) {
       const fileUrl = result.fileUrl;
+      const dataset_id = result.dataset_id;
 
       let recentFiles = JSON.parse(localStorage.getItem("recentFiles") || "[]");
       recentFiles = recentFiles.filter((file) => file.fileUrl !== fileUrl);
 
-      recentFiles.unshift({ fileName: selectedFile.name, fileUrl });
+      recentFiles.unshift({ fileName: selectedFile.name, fileUrl, dataset_id });
 
       if (recentFiles.length > 5) {
         recentFiles = recentFiles.slice(0, 5);
@@ -117,7 +118,7 @@ const validateCSVHeaders = async (file) => {
       setRecentFiles(recentFiles);
 
       toast.success(result.message || "File uploaded successfully!", { autoClose: 3000 });
-      navigate("/csv-preview", { state: { fileUrl } });
+      navigate("/csv-preview", { state: { fileUrl, dataset_id } });
     } else {
       toast.error(result.message || "Upload failed! Please try again.", { autoClose: 3000 });
     }

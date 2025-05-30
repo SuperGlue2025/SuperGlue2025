@@ -13,6 +13,7 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 import pandas as pd
 import traceback
+import sqlite3
 # add the definition of NumpyEncoder
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -52,7 +53,7 @@ def handle_similarity_search():
         # get params from request
         query_smiles = request_data.get('query_smiles')
         similarity_method = request_data.get('similarity_metric')
-        filename = request_data.get('filename')
+        dataset_id = request_data.get('dataset_id')
 
         # validate params
         if not query_smiles:
@@ -61,14 +62,14 @@ def handle_similarity_search():
                 "error": "Missing required parameter: query_smiles"
             }), 400
 
-        if not filename:
+        if not dataset_id:
             return jsonify({
                 "success": False,
-                "error": "Missing required parameter: filename"
+                "error": "Missing required parameter: dataset_id"
             }), 400
 
         # similarity search
-        results_df = similarity_search(query_smiles, filename, similarity_method)
+        results_df = similarity_search(query_smiles, dataset_id, similarity_method)
         if results_df.empty:
             return jsonify({
                 "success": False,
@@ -104,6 +105,7 @@ def handle_annotate_molecule():
         filename = request_data.get('filename')
         id = request_data.get('id')
         annotation_text = request_data.get('annotation', '')  # Get annotation text
+        dataset_id = request_data.get('dataset_id')
 
         # Validate required parameters
         if not molfile or not atom_indices:
@@ -130,14 +132,16 @@ def handle_annotate_molecule():
             fragment_smiles, fragment_smarts = get_smarts_smiles(mol, atom_indices, bond_indices)
 
             # Save to database with annotation
+            print("DEBUG: dataset_id received in save_substructure:", dataset_id)
             result = substructure_annotate.save_substructure(
+                dataset_id,
                 id,
                 mol_smiles,
                 atom_indices,
                 bond_indices,
                 fragment_smiles,
                 fragment_smarts,
-                annotation_text  # Add annotation text to save function
+                annotation_text
             )
 
             if result.get("success"):
@@ -186,8 +190,8 @@ def handle_visualize(cmpd_id):
 def handle_get_molecule_highlights():
     """Retrieve all highlighted substructures for a specific molecule."""
     try:
-        molecule_id = request.args.get('id')
-        filename = request.args.get('filename', '')
+        molecule_id = request.args.get('molecule_id') or request.args.get('id')
+        dataset_id = request.args.get('dataset_id')
 
         if not molecule_id:
             return jsonify({
@@ -196,7 +200,7 @@ def handle_get_molecule_highlights():
             }), 400
 
         # Call the function from the substructure_annotate module
-        result = substructure_annotate.get_molecule_highlights(molecule_id, filename)
+        result = substructure_annotate.get_molecule_highlights(molecule_id, dataset_id)
 
         return jsonify(result)
     except Exception as e:
@@ -771,6 +775,32 @@ def get_molecule_structure_api(molecule_id):
             'success': False,
             'message': f"Error retrieving structure: {str(e)}"
         }), 500
+
+@app.route('/api/compound_info')
+def get_compound_info():
+    molecule_id = request.args.get('molecule_id')
+    filename = request.args.get('filename')
+    DB_PATH = 'data/molecular_annotate.db'  # 路径按实际情况调整
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT dataset_id, molecule_id, smiles, property FROM compound WHERE molecule_id=? AND dataset_id=(SELECT dataset_id FROM dataset WHERE file_name=?)",
+        (molecule_id, filename)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        print("DEBUG: molecule_id:", molecule_id)
+        print("DEBUG: filename:", filename)
+        print("DEBUG: SQL result:", row)
+        return jsonify({
+            'dataset_id': row[0],
+            'molecule_id': row[1],
+            'smiles': row[2],
+            'property': row[3]
+        })
+    else:
+        return jsonify({'error': 'Not found'}), 404
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
