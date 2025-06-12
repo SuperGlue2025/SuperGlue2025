@@ -1,4 +1,4 @@
-/* 整体布局 */
+/* Overall layout */
 .app-container {
   font-family: Arial, sans-serif;
   color: #333;
@@ -8,7 +8,7 @@
   flex-direction: column;
 }
 
-/* 顶部导航栏 */
+/* Top navigation bar */
 .app-header {
   display: flex;
   justify-content: space-between;
@@ -46,7 +46,7 @@
   color: #007acc;
 }
 
-/* 主内容区域 */
+/* Main content area */
 .app-main {
   flex: 1;
   padding: 20px;
@@ -92,7 +92,7 @@
   color: #333;
 }
 
-/* 最近打开文件 */
+/* Recently opened files */
 .recent-files {
   background-color: #ffffff;
   padding: 20px;

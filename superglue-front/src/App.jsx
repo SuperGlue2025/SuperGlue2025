@@ -55,7 +55,7 @@ const App = () => {
   const fetchCaptcha = async (which) => {
     try {
       const res  = await fetch("http://localhost:5001/api/captcha", {
-        credentials: "include"          // 让 session cookie 带过去
+        credentials: "include"          // Include session cookie
       });
       const json = await res.json();
       if (!json.success) throw new Error("captcha error");
@@ -124,13 +124,13 @@ const App = () => {
       const fileUrl = json.fileUrl;
       let list = JSON.parse(localStorage.getItem("recentFiles") || "[]")
                    .filter(f => f.fileUrl !== fileUrl);
-      list.unshift({ fileName: selectedFile.name, fileUrl });
+      list.unshift({ fileName: selectedFile.name, fileUrl, dataset_id: json.dataset_id });
       if (list.length > 5) list = list.slice(0, 5);
       localStorage.setItem("recentFiles", JSON.stringify(list));
       setRecentFiles(list);
 
       toast.success(json.message || "Uploaded!", { autoClose: 3000 });
-      navigate("/csv-preview", { state: { fileUrl } });
+      navigate("/csv-preview", { state: { fileUrl, dataset_id: json.dataset_id } });
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Upload error", { autoClose: 3000 });
@@ -330,7 +330,7 @@ const App = () => {
                         <li
                           key={i}
                           onClick={() =>
-                            navigate("/csv-preview", { state: { fileUrl: f.fileUrl } })
+                            navigate("/csv-preview", { state: { fileUrl: f.fileUrl, dataset_id: f.dataset_id } })
                           }
                         >
                           {f.fileName}

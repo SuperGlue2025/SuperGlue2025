@@ -98,6 +98,7 @@ const MoleculeIndex = () => {
   const [substructureError, setSubstructureError] = useState('');
   const [selectedMolecule, setSelectedMolecule] = useState(null);
   const [moleculeSvg, setMoleculeSvg] = useState('');
+  const [substructureColumns, setSubstructureColumns] = useState([]);
 
   // Get previous page data
   const smilesFromCSV = location.state?.smiles;
@@ -111,6 +112,13 @@ const MoleculeIndex = () => {
 
   //admet properties
   const [admetResults, setAdmetResults] = useState(null);
+
+  // New states
+  const [is3dModeActive, setIs3dModeActive] = useState(false);
+  const [didAttemptLoad3d, setDidAttemptLoad3d] = useState(0);
+
+  // New dataset ID
+  const dataset_id = location.state?.dataset_id;
 
   const initializeKetcher = () => {
     const ketcherFrame = iframeRef.current;
@@ -247,16 +255,24 @@ const MoleculeIndex = () => {
     if (!molId || !ketcher) return;
   
     try {
-      const res  = await apiFetch(
-        `/api/get_molecule_highlights?id=${encodeURIComponent(molId)}`
-      );
+      const datasetId = location.state?.dataset_id;
+      // 如果molId带有前缀，去掉前缀后再请求
+      let molIdToUse = molId;
+      molIdToUse = String(molIdToUse || '');
+      if (molIdToUse.startsWith('cmpd_') || molIdToUse.startsWith('Compound-')) {
+        molIdToUse = molIdToUse.replace('cmpd_', '').replace('Compound-', '');
+      }
+      let url = `/api/get_molecule_highlights?id=${encodeURIComponent(molIdToUse)}`;
+      if (datasetId !== undefined && datasetId !== null && datasetId !== '') {
+        url += `&dataset_id=${encodeURIComponent(datasetId)}`;
+      }
+      const res  = await apiFetch(url);
       const json = await res.json();
       if (!json.success || !json.highlights?.length) return;
   
       const { atoms = [], bonds = [] } = json.highlights[0];
   
       applyHighlight({ atoms, bonds });
-
   
       message.success('Highlight restored successfully.');
     } catch (e) {
@@ -266,17 +282,11 @@ const MoleculeIndex = () => {
 
   // Get molfile of molecule
   const getMolfile = async () => {
-    if (!ketcher) {
-      message.error('Ketcher instance not initialized.');
-      return;
-    }
+    if (!ketcher) return '';
     try {
-      const molfile = await ketcher.getMolfile();
-      setKetcherMolfile(molfile);
-      message.success('Molfile fetched successfully.');
-    } catch (error) {
-      console.error('Error fetching Molfile from Ketcher:', error);
-      message.error('Failed to get Molfile.');
+      return await ketcher.getMolfile();
+    } catch {
+      return '';
     }
   };
 
@@ -325,7 +335,14 @@ const MoleculeIndex = () => {
       }
 
       const highlightData = {
-        compoundId: moleculeName || moleculeId || `Compound-${moleculeIdFromParams}`,
+        compoundId: (() => {
+          let id = moleculeName || moleculeId || `Compound-${moleculeIdFromParams}`;
+          id = String(id || '');
+          if (id.startsWith('cmpd_') || id.startsWith('Compound-')) {
+            id = id.replace('cmpd_', '').replace('Compound-', '');
+          }
+          return id;
+        })(),
         highlightedAtoms: atoms,
         highlightedBonds: bonds,
         smiles: smiles,
@@ -423,29 +440,51 @@ const MoleculeIndex = () => {
   const saveHighlightedAtoms = async (highlightData, annotation = '') => {
     try {
       if (!highlightData.highlightedAtoms || highlightData.highlightedAtoms.length === 0) {
-        console.warn('No atoms selected, no need to save');
         message.warning('No atoms selected, please select part of the molecule first');
         return;
       }
 
       setIsSavingAnnotation(true);
 
+      // 主动获取 molfile
+      let molfile = highlightData.molfile || ketcherMolfile;
+      if (!molfile && ketcher) {
+        molfile = await getMolfile();
+      }
+
       const payload = {
-        id: moleculeId,
+        id: (() => {
+          let id = moleculeId;
+          id = String(id || '');
+          if (id.startsWith('cmpd_') || id.startsWith('Compound-')) {
+            id = id.replace('cmpd_', '').replace('Compound-', '');
+          }
+          return id;
+        })(),
         filename: filename || '',
         smiles: highlightData.smiles,
+        molfile: molfile,
         atoms: highlightData.highlightedAtoms,
         bonds: highlightData.highlightedBonds,
-        annotation: annotation
+        annotation: annotation,
+        dataset_id: location.state?.dataset_id || 1
       };
+
+      if (!payload.molfile) {
+        message.error('无法获取分子结构，请先在编辑器中加载分子。');
+        setIsSavingAnnotation(false);
+        return;
+      }
 
       console.log('Sending payload to server:', payload);
 
-      const response = await apiFetch('/api/annotate_molecule', {
-          method : 'POST',
-          headers: { 'Content-Type':'application/json' },
-          body   : JSON.stringify(payload)
-        });
+      const response = await fetch(`http://localhost:5001/api/annotate_molecule`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
 
       const responseText = await response.text();
       console.log('Server response (raw):', responseText);
@@ -517,32 +556,35 @@ const MoleculeIndex = () => {
 
   // loadSavedHighlights
   const loadSavedHighlights = async () => {
-    if (!moleculeId) {
-      return;
-    }
-
+    if (!moleculeId) return;
     setIsLoadingHighlights(true);
     try {
-      const response = await apiFetch(`/api/get_molecule_highlights?id=${moleculeId}&filename=${filename || ''}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
+      const response = await fetch(
+        `http://localhost:5001/api/get_molecule_highlights?id=${moleculeId}&filename=${filename || ''}&dataset_id=${dataset_id || ''}`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
         }
-      });
-
+      );
       const data = await response.json();
-
       if (response.ok && data.success) {
-        setSavedHighlights(data.highlights || []);
-
-        if (data.highlights && data.highlights.length > 0) {
+        const validHighlights = (data.highlights || []).filter(
+          h => h && typeof h === 'object' && !Array.isArray(h) && Array.isArray(h.atoms) && h.atoms.length > 0
+        );
+        setSavedHighlights(validHighlights);
+        if (validHighlights.length > 0) {
           setCurrentHighlightIndex(0);
-          applyHighlight(data.highlights[0]);
+        } else {
+          setCurrentHighlightIndex(-1);
         }
       } else {
+        setSavedHighlights([]);
+        setCurrentHighlightIndex(-1);
         console.error('loading highlights failed:', data.message);
       }
     } catch (error) {
+      setSavedHighlights([]);
+      setCurrentHighlightIndex(-1);
       console.error('connecting server error:', error);
     } finally {
       setIsLoadingHighlights(false);
@@ -650,6 +692,12 @@ const MoleculeIndex = () => {
 
   // Handle sidebar actions
   const handleSidebarAction = (action) => {
+    if (action === 'modify') {
+      setIs3dModeActive(true);
+      setDidAttemptLoad3d(prev => prev + 1);
+    } else {
+      setIs3dModeActive(false);
+    }
     setSelectedTab(action);
 
     if (action === 'compute') {
@@ -668,53 +716,42 @@ const MoleculeIndex = () => {
 
   // Use the current apply highlight as a substructure
   const performSubstructureMatching = async () => {
-    if (!ketcher) {
+    if (!ketcher) return;
+    if (savedHighlights.length === 0 || currentHighlightIndex < 0) {
+      message.warning('Please select a highlight');
       return;
     }
-
+    const currentHighlight = savedHighlights[currentHighlightIndex];
+    const atoms = currentHighlight.atoms || [];
+    const bonds = currentHighlight.bonds || [];
+    if (atoms.length === 0) {
+      message.warning('Current highlight has no atoms');
+      return;
+    }
+    setIsLoadingSubstructure(true);
+    setSubstructureError('');
+    const smiles = await ketcher.getSmiles();
+    const molfile = await ketcher.getMolfile();
+    const payload = {
+      query_smiles: smiles,
+      molfile: molfile,
+      query_id: moleculeName || moleculeId || `Compound-${moleculeIdFromParams}`,
+      atoms: atoms,
+      bonds: bonds,
+      filename: filename || '',
+      dataset_id: dataset_id
+    };
     try {
-      if (savedHighlights.length === 0 || currentHighlightIndex < 0) {
-        return;
-      }
-
-      // Get current highlight
-      const currentHighlight = savedHighlights[currentHighlightIndex];
-      const atoms = currentHighlight.atoms || [];
-      const bonds = currentHighlight.bonds || [];
-
-      if (atoms.length === 0) {
-        message.warning('There is no atoms in current highlight.');
-        return;
-      }
-
-      setIsLoadingSubstructure(true);
-      setSubstructureError('');
-
-      const smiles = await ketcher.getSmiles();
-
-      const payload = {
-        query_smiles: smiles,
-        query_id: moleculeName || moleculeId || `Compound-${moleculeIdFromParams}`,
-        atoms: atoms,
-        bonds: bonds,
-        filename: filename || ''
-      };
-
       const response = await fetch('http://localhost:5001/api/substructure_search', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`server error: ${response.status}. ${errorText}`);
+        throw new Error(`Server error: ${response.status}. ${errorText}`);
       }
-
       const data = await response.json();
-
       if (data.success) {
         const formattedResults = data.results.map(result => ({
           key: result.id || `result-${Math.random().toString(36).substr(2, 9)}`,
@@ -722,35 +759,43 @@ const MoleculeIndex = () => {
           smiles: result.smiles || result.SMILES || '',
           fragment_smarts: result.fragment_smarts || '',
           fragment_smiles: result.fragment_smiles || '',
-          ...result // other properties
+          ...result
         }));
-
         setSubstructureResults(formattedResults);
+        setSubstructureColumns(generateSubstructureColumns(formattedResults));
         setShowSubstructureResults(true);
-        message.success(`find ${formattedResults.length} matching molecules`);
-
+        message.success(`Found ${formattedResults.length} matching molecules`);
         if (data.fragment_smarts) {
           message.info(`SMARTS: ${data.fragment_smarts}`);
         }
       } else {
-        throw new Error(data.error || '未找到匹配的化合物');
+        throw new Error(data.error || 'No matching compounds found');
       }
     } catch (error) {
-      console.error('substructure searching error:', error);
       setSubstructureError(error.message);
-      message.error(`searching erro: ${error.message}`);
+      message.error(`Search error: ${error.message}`);
     } finally {
       setIsLoadingSubstructure(false);
     }
   };
 
   
-const fetchMoleculeSvg = async (smiles, fragment_smarts = null) => {
+const fetchMoleculeSvg = async (smiles, fragment_smarts = null, match_data = null) => {
   try {
     const requestBody = {
       smiles: smiles,
       fragment_smarts: fragment_smarts
     };
+
+    // Support for handling match data
+    if (match_data && typeof match_data === 'object') {
+      if (Array.isArray(match_data.match_atoms)) {
+        requestBody.match_atoms = match_data.match_atoms;
+      }
+      if (Array.isArray(match_data.match_bonds)) {
+        requestBody.match_bonds = match_data.match_bonds;
+      }
+    }
 
     console.log("SVG generate:", requestBody);
 
@@ -778,48 +823,66 @@ const fetchMoleculeSvg = async (smiles, fragment_smarts = null) => {
   }
 };
 
-const substructureColumns = [
-  {
-    title: 'Cmpd Id',
-    dataIndex: 'cmpd_id',
-    key: 'cmpd_id',
-  },
-  {
-    title: 'SMILES',
-    dataIndex: 'smiles',
-    key: 'smiles',
-    ellipsis: true,
-    render: smiles => (
-      <div style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {smiles}
-      </div>
-    )
-  },
-
-{
-  title: 'Actions',
-  key: 'actions',
-  render: (_, record) => (
-    <Space>
-      <Button size="small" onClick={() => {
-        setSelectedMolecule(record);
-
-        // Always use SMARTS pattern for highlighting if available
-        if (record.fragment_smarts) {
-          console.log(`Highlighting using SMARTS: ${record.fragment_smarts}`);
-          fetchMoleculeSvg(record.smiles, record.fragment_smarts);
-        } else {
-          console.log(`No SMARTS available, displaying molecule without highlight`);
-          fetchMoleculeSvg(record.smiles);
-        }
-      }}>
-        View
-      </Button>
-    </Space>
-  ),
-},
-
-];
+const generateSubstructureColumns = (results) => {
+  if (!results || results.length === 0) {
+    return [
+      {
+        title: 'Cmpd Id',
+        dataIndex: 'cmpd_id',
+        key: 'cmpd_id',
+      },
+      {
+        title: 'SMILES',
+        dataIndex: 'smiles',
+        key: 'smiles',
+        ellipsis: true,
+        render: smiles => (
+          <div style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {smiles}
+          </div>
+        )
+      }
+    ];
+  }
+  
+  // If there are results, return the full column definition
+  return [
+    {
+      title: 'Cmpd Id',
+      dataIndex: 'cmpd_id',
+      key: 'cmpd_id',
+    },
+    {
+      title: 'SMILES',
+      dataIndex: 'smiles',
+      key: 'smiles',
+      ellipsis: true,
+      render: smiles => (
+        <div style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {smiles}
+        </div>
+      )
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button size="small" onClick={() => {
+            setSelectedMolecule(record);
+            const matchData = {
+              match_atoms: record.match_atoms || [],
+              match_bonds: record.match_bonds || []
+            };
+            fetchMoleculeSvg(record.smiles, record.fragment_smarts, matchData);
+          }}>
+            View
+          </Button>
+        </Space>
+      ),
+    }
+  ];
+};
 
   // Handle similarity search results
   const handleSimilarityResults = (results, method) => {
@@ -958,112 +1021,55 @@ const substructureColumns = [
   };
 
 // Results table columns with filter indicators
-  const resultColumns = [
+  const getBaseResultColumns = () => ([
     {
       title: 'Cmpd Id',
       dataIndex: 'cmpd_id',
       key: 'cmpd_id',
     },
     {
-      title: (
-        <span>
-          Similarity
-          {filtersActive && activeFilters.similarity && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
+      title: 'Similarity',
       dataIndex: 'similarity',
       key: 'similarity',
       sorter: (a, b) => a.similarity - b.similarity,
       render: value => (value * 100).toFixed(1) + '%',
       defaultSortOrder: 'descend',
     },
-    {
-      title: (
-        <span>
-          Binary Occ
-          {filtersActive && activeFilters.binary_occ && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'binary_occ',
-      key: 'binary_occ',
-      sorter: (a, b) => a.binary_occ - b.binary_occ,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
-      title: (
-        <span>
-          Cont Occ
-          {filtersActive && activeFilters.cont_occ && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'cont_occ',
-      key: 'cont_occ',
-      sorter: (a, b) => a.cont_occ - b.cont_occ,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
-      title: (
-        <span>
-          Low Gsh Prob
-          {filtersActive && activeFilters.low_gsh_prob && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'low_gsh_prob',
-      key: 'low_gsh_prob',
-      sorter: (a, b) => a.low_gsh_prob - b.low_gsh_prob,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
-      title: (
-        <span>
-          Med Gsh Prob
-          {filtersActive && activeFilters.med_gsh_prob && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'med_gsh_prob',
-      key: 'med_gsh_prob',
-      sorter: (a, b) => a.med_gsh_prob - b.med_gsh_prob,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
-      title: (
-        <span>
-          High Gsh Prob
-          {filtersActive && activeFilters.high_gsh_prob && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'high_gsh_prob',
-      key: 'high_gsh_prob',
-      sorter: (a, b) => a.high_gsh_prob - b.high_gsh_prob,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
-      title: (
-        <span>
-          Selectivity
-          {filtersActive && activeFilters.selectivity && (
-            <FilterOutlined style={{ color: '#1890ff', marginLeft: 3 }} />
-          )}
-        </span>
-      ),
-      dataIndex: 'selectivity',
-      key: 'selectivity',
-      sorter: (a, b) => a.selectivity - b.selectivity,
-      render: value => value?.toFixed(2) || '-',
-    },
-    {
+  ]);
+
+  const generateDynamicResultColumns = (results) => {
+    if (!results || results.length === 0) {
+      return getBaseResultColumns();
+    }
+    const columnsToShow = [...getBaseResultColumns()];
+    const excludedFields = ['id', 'similarity', 'key', 'smiles', 'molfile', 'structure'];
+    const allKeys = Object.keys(results[0]);
+    allKeys.forEach(key => {
+      if (!excludedFields.includes(key.toLowerCase()) && key !== 'cmpd_id') {
+        const sampleValue = results[0][key];
+        const isNumeric = typeof sampleValue === 'number' || (typeof sampleValue === 'string' && !isNaN(parseFloat(sampleValue)));
+        columnsToShow.push({
+          title: key,
+          dataIndex: key,
+          key: key,
+          sorter: isNumeric ? (a, b) => {
+            const aVal = typeof a[key] === 'number' ? a[key] : parseFloat(a[key]);
+            const bVal = typeof b[key] === 'number' ? b[key] : parseFloat(b[key]);
+            return aVal - bVal;
+          } : undefined,
+          render: value => {
+            if (value === null || value === undefined) return '-';
+            if (isNumeric) {
+              return typeof value === 'number' ? value.toFixed(2) : parseFloat(value).toFixed(2);
+            }
+            return value;
+          },
+          ellipsis: true,
+        });
+      }
+    });
+    // 最后加上Actions列
+    columnsToShow.push({
       title: 'Actions',
       key: 'actions',
       render: (_, record) => (
@@ -1081,10 +1087,29 @@ const substructureColumns = [
           </Button>
         </Space>
       ),
-    },
-  ];
+    });
+    return columnsToShow;
+  };
 
   const ketcherPath = window.location.origin + '/standalone/index.html';
+
+  useEffect(() => {
+    if (selectedTab === 'export') {
+      loadSavedHighlights();
+    }
+  }, [selectedTab, moleculeId, location.state?.dataset_id]);
+
+  // 高亮点击
+  const handleHighlightSelect = (highlight) => {
+    const idx = savedHighlights.findIndex(h =>
+      h.id === highlight.id ||
+      (h.atoms && highlight.atoms && JSON.stringify(h.atoms) === JSON.stringify(highlight.atoms))
+    );
+    if (idx >= 0) {
+      setCurrentHighlightIndex(idx);
+      applyHighlight(highlight);
+    }
+  };
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -1145,7 +1170,7 @@ const substructureColumns = [
                 icon={<FilterOutlined />}
                 style={{ marginRight: '8px' }}
                 onClick={() => setShowFilterSidebar(!showFilterSidebar)}
-                >
+              >
                 {showFilterSidebar ? 'Hide Filters' : 'Show Filters'}
               </Button>
               <Button
@@ -1198,8 +1223,7 @@ const substructureColumns = [
                       background: '#fff',
                       padding: '12px',
                       width: '100%',
-                      height:
-                       selectedTab ==='modify' ? 'calc(50vh - 112px)' : 'calc(100vh - 112px)',
+                      height: '40vh',
                       borderRadius: '4px',
                       boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
                       overflow: 'hidden'
@@ -1220,6 +1244,9 @@ const substructureColumns = [
                   <SimpleMoleculeViewer
                     ketcher={ketcher}
                     ketcherPath={ketcherPath}
+                    moleculeId={moleculeName || moleculeId || `Compound-${moleculeIdFromParams || Date.now()}`}
+                    isActive={is3dModeActive}
+                    key={`3d-view-${didAttemptLoad3d}`}
                   />
                 </div>
               )}
@@ -1238,7 +1265,7 @@ const substructureColumns = [
                       {/* Results table taking 2/3 of space */}
                       <div style={{ flex: 2, marginRight: '12px', overflowY: 'auto' }}>
                         <Table
-                          columns={substructureColumns}
+                          columns={generateSubstructureColumns(substructureResults)}
                           dataSource={substructureResults}
                           size="small"
                           pagination={{
@@ -1322,7 +1349,7 @@ const substructureColumns = [
                   </div>
 
                   <Table
-                    columns={resultColumns}
+                    columns={generateDynamicResultColumns(similarityResults)}
                     dataSource={similarityResults}
                     size="small"
                     pagination={{
@@ -1486,22 +1513,14 @@ const substructureColumns = [
                   <div>
                     <div className="highlight-annotate-section">
                       <HighlightAnnotateComponent
-                        moleculeId={moleculeId || `Compound-${moleculeIdFromParams}`}
+                        moleculeId={moleculeId}
                         filename={filename}
-                        isLoadingHighlights={isLoadingHighlights}
-                        onHighlightSelect={(highlight) => {
-                          // Apply the selected highlight to the molecule
-                          applyHighlight(highlight);
-                          // Set as current highlight
-                          const index = savedHighlights.findIndex(h =>
-                            h.id === highlight.id ||
-                            (h.atoms && highlight.atoms && JSON.stringify(h.atoms) === JSON.stringify(highlight.atoms))
-                          );
-                          if (index >= 0) {
-                            setCurrentHighlightIndex(index);
-                          }
-                        }}
+                        dataset_id={dataset_id}
+                        savedHighlights={savedHighlights}
+                        currentHighlightIndex={currentHighlightIndex}
+                        onHighlightSelect={handleHighlightSelect}
                         onPerformSubstructureMatch={performSubstructureMatching}
+                        isLoadingHighlights={isLoadingHighlights}
                       />
                     </div>
                   </div>
@@ -1515,13 +1534,21 @@ const substructureColumns = [
       {/* Similarity Search Modal */}
       <SimilaritySearch
         currentSmiles={currentSmiles}
-        currentId={moleculeName || moleculeId || `Compound-${moleculeIdFromParams}`}
+        currentId={(() => {
+          let id = moleculeName || moleculeId || `Compound-${moleculeIdFromParams}`;
+          id = String(id || '');
+          if (id.startsWith('cmpd_') || id.startsWith('Compound-')) {
+            id = id.replace('cmpd_', '').replace('Compound-', '');
+          }
+          return id;
+        })()}
         filename={filename}
         visible={similaritySearchVisible}
         onClose={() => setSimilaritySearchVisible(false)}
         onResultsFound={handleSimilarityResults}
         ketcher={ketcher}
         moleculeProperties={moleculeProperties}
+        dataset_id={location.state?.dataset_id}
       />
     </Layout>
   );

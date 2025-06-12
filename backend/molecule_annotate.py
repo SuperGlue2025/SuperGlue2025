@@ -83,124 +83,111 @@ def get_compound(cmpd_id):
     compound = service.compounds_df[service.compounds_df['cmpd_id'] == cmpd_id].to_dict('records')
     return jsonify(compound[0] if compound else {})
 
-def get_smarts_smiles(mol_smiles, atom_indices, bond_indices):
-    """Generate better SMARTS for substructure highlighting"""
-    print(f"Generating SMARTS for atom indices: {atom_indices}, bond indices: {bond_indices}")
-    mol = Chem.MolFromSmiles(mol_smiles)
+def auto_complete_ring_bonds(mol, atom_indices, bond_indices):
+    atom_set = set(atom_indices)
+    bond_set = set(bond_indices)
+    completed_bonds = list(bond_indices)
+
+    # Directly check if there are any bonds connecting the selected atoms that are not included
+    for bond in mol.GetBonds():
+        begin_idx = bond.GetBeginAtomIdx()
+        end_idx = bond.GetEndAtomIdx()
+
+        # If both atoms connected by the bond are in the selected atom_indices
+        if begin_idx in atom_set and end_idx in atom_set:
+            bond_idx = bond.GetIdx()
+            # Add the bond if it is not already selected
+            if bond_idx not in bond_set:
+                completed_bonds.append(bond_idx)
+                bond_set.add(bond_idx)
+                print(f"Added missing bond: {bond_idx} (between atoms {begin_idx}-{end_idx})")
+
+    return completed_bonds
+
+
+def get_smarts_smiles(mol, atom_indices, bond_indices):
+    """
+    Generate SMARTS and SMILES representations of the fragment
+    based on the molecule object and selected atoms/bonds.
+    """
     if not mol:
-        print("Could not create molecule from SMILES")
+        print("Could not create molecule from molfile")
         return None, None
 
-    # Check for fluorobenzene pattern
-    is_fluorobenzene = False
-    has_fluorine = False
-    has_aromatic_ring = False
-
-    # Analyze selected atoms
-    for idx in atom_indices:
-        atom = mol.GetAtomWithIdx(idx)
-        if atom.GetSymbol() == "F":
-            has_fluorine = True
-        if atom.GetIsAromatic() and atom.GetSymbol() == "C":
-            has_aromatic_ring = True
-
-    # If we have both a fluorine and aromatic atoms, check if they form a fluorobenzene
-    if has_fluorine and has_aromatic_ring:
-        # Check if at least 4-6 atoms are part of an aromatic ring
-        aromatic_atoms = sum(1 for idx in atom_indices if mol.GetAtomWithIdx(idx).GetIsAromatic())
-        if aromatic_atoms >= 4:
-            is_fluorobenzene = True
-            print("Detected fluorobenzene pattern")
-
-    if is_fluorobenzene:
-        # Return specific SMARTS for fluorobenzene
-        return "Fc1ccccc1", "c1ccccc1[F]"
-
-    # For other patterns, create a molecule from the selected atoms
-    fragment = Chem.RWMol()
-    atom_map = {}
-
-    # Add atoms with atom mapping
+    # Add atom mapping numbers to selected atoms for tracking
     for i, idx in enumerate(atom_indices):
-        old_atom = mol.GetAtomWithIdx(idx)
-        new_atom = Chem.Atom(old_atom.GetSymbol())
-        new_atom.SetFormalCharge(old_atom.GetFormalCharge())
-        new_atom.SetChiralTag(old_atom.GetChiralTag())
-        new_atom.SetIsAromatic(old_atom.GetIsAromatic())
-        new_atom.SetAtomMapNum(i + 1)  # Set atom mapping
+        mol.GetAtomWithIdx(idx).SetAtomMapNum(i + 1)
 
-        new_idx = fragment.AddAtom(new_atom)
-        atom_map[idx] = new_idx
+    # Ensure indices are of integer type
+    atom_indices = list(map(int, atom_indices))
+    bond_indices = list(map(int, bond_indices))
 
-    # Add bonds between selected atoms
-    for bond_idx in bond_indices:
-        try:
-            bond = mol.GetBondWithIdx(bond_idx)
-            begin_idx = bond.GetBeginAtomIdx()
-            end_idx = bond.GetEndAtomIdx()
+    print(f"Bond indices used: {bond_indices}")
 
-            if begin_idx in atom_map and end_idx in atom_map:
-                fragment.AddBond(
-                    atom_map[begin_idx],
-                    atom_map[end_idx],
-                    bond.GetBondType()
+    # Special handling for single atom fragments to generate more precise SMARTS
+    if len(atom_indices) == 1:
+        atom_idx = atom_indices[0]
+        atom = mol.GetAtomWithIdx(atom_idx)
+        atom_symbol = atom.GetSymbol()
+
+        # Get total explicit and implicit hydrogen count for the atom
+        h_count = atom.GetTotalNumHs()
+
+        # Generate more precise SMARTS for hydrogenated single atoms
+        if h_count > 0:
+            # Use specific hydrogen count in SMARTS
+            custom_smarts = f'[{atom_symbol}H{h_count}:1]'
+            print(f"Using detailed SMARTS for {atom_symbol} with {h_count} H: {custom_smarts}")
+
+            # Try generating SMILES if possible
+            try:
+                fragment_smiles = Chem.MolFragmentToSmiles(
+                    mol,
+                    atomsToUse=atom_indices,
+                    bondsToUse=bond_indices,
+                    isomericSmiles=True
                 )
-        except Exception as e:
-            print(f"Error adding bond {bond_idx}: {e}")
+            except Exception as e:
+                print(f"Error generating SMILES: {e}")
+                fragment_smiles = None
 
-    # Ensure fragment is connected - add any missing bonds between selected atoms
-    for i, idx1 in enumerate(atom_indices):
-        for j, idx2 in enumerate(atom_indices[i + 1:], i + 1):
-            bond = mol.GetBondBetweenAtoms(idx1, idx2)
-            if bond and begin_idx in atom_map and end_idx in atom_map:
-                try:
-                    fragment.AddBond(
-                        atom_map[idx1],
-                        atom_map[idx2],
-                        bond.GetBondType()
-                    )
-                except:
-                    # May already have this bond
-                    pass
+            # Reset atom map numbers
+            for idx in atom_indices:
+                mol.GetAtomWithIdx(idx).SetAtomMapNum(0)
 
-    # Generate SMILES and SMARTS
-    fragment_smiles = ""
-    fragment_smarts = ""
+            print(f"Generated custom SMARTS for single atom: {custom_smarts}")
+            print(f"Generated SMILES: {fragment_smiles}")
+
+            return fragment_smiles, custom_smarts
+
+    # Fallback to standard method for SMARTS and SMILES generation
+    try:
+        fragment_smarts = Chem.MolFragmentToSmarts(
+            mol,
+            atomsToUse=atom_indices,
+            bondsToUse=bond_indices,
+            isomericSmarts=True
+        )
+    except Exception as e:
+        print(f"Error generating SMARTS: {e}")
+        fragment_smarts = None
 
     try:
-        # Convert to molecule
-        fragment_mol = fragment.GetMol()
-
-        # Generate SMILES
-        fragment_smiles = Chem.MolToSmiles(fragment_mol)
-
-        # Generate SMARTS - ensure it's connected
-        fragment_smarts = Chem.MolToSmarts(fragment_mol)
-
-        # Make sure we don't have disconnected components
-        if "." in fragment_smarts:
-            fragment_smarts = fragment_smarts.replace(".", "-")
-
-        # Test the pattern
-        test_pattern = Chem.MolFromSmarts(fragment_smarts)
-        if test_pattern:
-            matches = mol.GetSubstructMatches(test_pattern)
-            print(f"Testing SMARTS: found {len(matches)} matches")
-
-            # If too many matches, create a more specific pattern
-            if len(matches) > 15:
-                print("Too many matches, creating more specific pattern")
-                # Try to create a pattern with environment
-                # For simplicity just add more constraints
-                fragment_smarts = "c1c([F])cccc1" if is_fluorobenzene else fragment_smarts
+        fragment_smiles = Chem.MolFragmentToSmiles(
+            mol,
+            atomsToUse=atom_indices,
+            bondsToUse=bond_indices,
+            isomericSmiles=True
+        )
     except Exception as e:
-        print(f"Error generating SMARTS/SMILES: {e}")
-        # Fallback to fluorobenzene pattern if that's what we detected
-        if is_fluorobenzene:
-            fragment_smiles = "Fc1ccccc1"
-            fragment_smarts = "c1ccccc1[F]"
+        print(f"Error generating SMILES: {e}")
+        fragment_smiles = None
 
-    print(f"Final fragment SMILES: {fragment_smiles}")
-    print(f"Final SMARTS pattern: {fragment_smarts}")
+    # Reset atom mapping numbers
+    for idx in atom_indices:
+        mol.GetAtomWithIdx(idx).SetAtomMapNum(0)
+
+    print(f"Generated SMARTS: {fragment_smarts}")
+    print(f"Generated SMILES: {fragment_smiles}")
 
     return fragment_smiles, fragment_smarts

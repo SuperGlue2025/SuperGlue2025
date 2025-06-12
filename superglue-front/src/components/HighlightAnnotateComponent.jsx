@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Button, List, Typography, Divider, Empty, message, Select } from 'antd';
 import { SearchOutlined, EditOutlined, DeleteOutlined, SortAscendingOutlined } from '@ant-design/icons';
 import PropTypes from 'prop-types';
-import { apiFetch } from '../api';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -10,110 +9,19 @@ const { Option } = Select;
 const HighlightAnnotateComponent = ({
   moleculeId,
   filename,
+  dataset_id,
+  savedHighlights = [],
+  currentHighlightIndex = -1,
   onHighlightSelect,
   onPerformSubstructureMatch,
   isLoadingHighlights = false
 }) => {
-  const [savedHighlights, setSavedHighlights] = useState([]);
   const [sortOrder, setSortOrder] = useState('date_modified');
   const [sortDirection, setSortDirection] = useState('desc');
 
-  // Load saved highlights
-  useEffect(() => {
-    if (moleculeId) {
-      loadSavedHighlights();
-    }
-  }, [moleculeId]);
-
-  // Load saved highlights function
-  const loadSavedHighlights = async () => {
-    try {
-      // Fetch data from the backend API
-      const response = await apiFetch(`/api/get_molecule_highlights?id=${moleculeId}&filename=${filename || ''}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setSavedHighlights(data.highlights || []);
-      } else {
-        console.error('Failed to load highlights:', data.message);
-        message.error(`Failed to load highlights: ${data.message || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('Server connection error:', error);
-      message.error('Server connection error');
-    }
-  };
-
-  // Handle highlight click
-  const handleHighlightClick = (highlight) => {
-    if (onHighlightSelect) {
-      onHighlightSelect(highlight);
-    }
-  };
-
-  // Handle delete highlight
-  const handleDeleteHighlight = async (highlightId, e) => {
-    if (e) e.stopPropagation();
-    try {
-      const response = await apiFetch(`/api/delete_highlight`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          id: moleculeId,
-          highlightId: highlightId,
-          filename: filename || ''
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        message.success('Highlight deleted successfully');
-        loadSavedHighlights(); // Refresh the list
-      } else {
-        message.error(`Failed to delete: ${data.message || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('Server connection error:', error);
-      message.error('Server connection error');
-    }
-  };
-
-  // Handle edit highlight
-  const handleEditHighlight = (highlight, e) => {
-    if (e) e.stopPropagation();
-    message.info('Edit functionality to be implemented');
-  };
-
-  // Handle substructure match
-  const handleSubstructureMatch = () => {
-    if (onPerformSubstructureMatch) {
-      onPerformSubstructureMatch();
-    }
-  };
-
-  // Handle sort order change
-  const handleSortChange = (value) => {
-    setSortOrder(value);
-  };
-
-  // Handle sort direction toggle
-  const handleSortDirectionToggle = () => {
-    setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-  };
-
-  // Sort highlights based on current sort settings
+  // Sorting
   const sortedHighlights = [...savedHighlights].sort((a, b) => {
     let comparison = 0;
-
     if (sortOrder === 'date_modified') {
       const dateA = new Date(a.timestamp || 0);
       const dateB = new Date(b.timestamp || 0);
@@ -123,9 +31,55 @@ const HighlightAnnotateComponent = ({
       const nameB = b.annotation || '';
       comparison = nameA.localeCompare(nameB);
     }
-
     return sortDirection === 'asc' ? comparison : -comparison;
   });
+
+  // Handle highlight click
+  const handleHighlightClick = (highlight) => {
+    if (onHighlightSelect) {
+      onHighlightSelect(highlight);
+    }
+  };
+
+  const handleDeleteHighlight = async (highlightId, e) => {
+    if (e) e.stopPropagation();
+    try {
+      const response = await fetch(`http://localhost:5001/api/delete_highlight`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: (() => {
+            let id = String(moleculeId);
+            if (id.startsWith('cmpd_') || id.startsWith('Compound-')) {
+              id = id.replace('cmpd_', '').replace('Compound-', '');
+            }
+            return id;
+          })(),
+          highlightId: highlightId,
+          filename: filename || '',
+          dataset_id: dataset_id
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        message.success('Highlight deleted successfully');
+      } else {
+        message.error(`Failed to delete: ${data.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Server connection error:', error);
+      message.error('Server connection error');
+    }
+  };
+
+  const handleEditHighlight = (highlight, e) => {
+    if (e) e.stopPropagation();
+    message.info('Edit functionality to be implemented');
+  };
 
   return (
     <div className="highlight-annotate-container">
@@ -138,22 +92,12 @@ const HighlightAnnotateComponent = ({
 
       <Divider orientation="left">Saved highlights / annotations</Divider>
 
-      {/*<Button*/}
-      {/*  type="primary"*/}
-      {/*  block*/}
-      {/*  style={{ marginBottom: '16px' }}*/}
-      {/*  onClick={loadSavedHighlights}*/}
-      {/*  loading={isLoadingHighlights}*/}
-      {/*>*/}
-      {/*  Load Saved Highlights*/}
-      {/*</Button>*/}
-
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
         <Text style={{ marginRight: '8px' }}>Sort by:</Text>
         <Select
           defaultValue="date_modified"
           style={{ width: 150 }}
-          onChange={handleSortChange}
+          onChange={setSortOrder}
         >
           <Option value="date_modified">Date Modified</Option>
           <Option value="name">Name</Option>
@@ -161,7 +105,7 @@ const HighlightAnnotateComponent = ({
         <Button
           type="text"
           icon={<SortAscendingOutlined />}
-          onClick={handleSortDirectionToggle}
+          onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
           style={{ marginLeft: '8px' }}
         />
       </div>
@@ -178,7 +122,7 @@ const HighlightAnnotateComponent = ({
             renderItem={highlight => (
               <List.Item
                 key={highlight.id}
-                className="highlight-list-item"
+                className={`highlight-list-item${highlight.id === savedHighlights[currentHighlightIndex]?.id ? ' active' : ''}`}
                 style={{
                   cursor: 'pointer',
                   padding: '8px 12px',
@@ -223,7 +167,7 @@ const HighlightAnnotateComponent = ({
         type="primary"
         block
         icon={<SearchOutlined />}
-        onClick={handleSubstructureMatch}
+        onClick={onPerformSubstructureMatch}
         className="substructure-tool-btn"
       >
         Substructure Match
@@ -234,8 +178,11 @@ const HighlightAnnotateComponent = ({
 
 // PropTypes for validation
 HighlightAnnotateComponent.propTypes = {
-  moleculeId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  moleculeId: PropTypes.string.isRequired,
   filename: PropTypes.string,
+  dataset_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  savedHighlights: PropTypes.array,
+  currentHighlightIndex: PropTypes.number,
   onHighlightSelect: PropTypes.func,
   onPerformSubstructureMatch: PropTypes.func,
   isLoadingHighlights: PropTypes.bool

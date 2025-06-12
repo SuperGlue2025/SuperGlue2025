@@ -1,8 +1,8 @@
-
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import "../styles/main.css";
+import { message } from "antd";
 
 const CsvPreview = () => {
   const location = useLocation();
@@ -16,8 +16,19 @@ const CsvPreview = () => {
   const [columnsToShow, setColumnsToShow] = useState(["cmpd_id", "SMILES"]);
   const [idColumn, setIdColumn] = useState("cmpd_id");
   const [smilesColumn, setSmilesColumn] = useState("SMILES");
+  const [datasetId, setDatasetId] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // detect id column and smiles column
+  // Clean up recentFiles items without dataset_id on page load
+  useEffect(() => {
+    const recent = JSON.parse(localStorage.getItem("recentFiles") || "[]");
+    const filtered = recent.filter(f => f.dataset_id);
+    if (filtered.length !== recent.length) {
+      localStorage.setItem("recentFiles", JSON.stringify(filtered));
+    }
+  }, []);
+
+  // Detect ID column and SMILES column
   const identifySpecialColumns = (headers, data) => {
     const idPatterns = [
       /^id$/i,
@@ -40,7 +51,7 @@ const CsvPreview = () => {
       /^chem.?structure$/i
     ];
 
-    // recognize id column
+    // Recognize ID column
     let detectedIdColumn = '';
     for (const pattern of idPatterns) {
       const match = headers.find(header => pattern.test(header));
@@ -50,7 +61,7 @@ const CsvPreview = () => {
       }
     }
 
-    // if no ID column matching the patterns is found, check for columns with unique values (possibly IDs)
+    // If no ID column matching the patterns is found, check for columns with unique values (possibly IDs)
     if (!detectedIdColumn) {
       const uniqueValueCounts = {};
       headers.forEach(header => {
@@ -59,21 +70,21 @@ const CsvPreview = () => {
         uniqueValueCounts[header] = uniqueValues.size;
       });
 
-      // if a column has unique values equal to the number of data rows, it might be an ID column
+      // If a column has unique values equal to the number of data rows, it might be an ID column
       const possibleIdColumns = headers.filter(header =>
         uniqueValueCounts[header] === data.length &&
-        !smilesPatterns.some(pattern => pattern.test(header)) // exclude SMILES columns
+        !smilesPatterns.some(pattern => pattern.test(header)) // Exclude SMILES columns
       );
 
       if (possibleIdColumns.length > 0) {
-        // prioritize columns that look like IDs (contain numbers or short strings)
+        // Prioritize columns that look like IDs (contain numbers or short strings)
         detectedIdColumn = possibleIdColumns.find(header =>
           data.some(row => /^\d+$/.test(row[header]))
         ) || possibleIdColumns[0];
       }
     }
 
-    // recognize smiles column
+    // Recognize SMILES column
     let detectedSmilesColumn = '';
     for (const pattern of smilesPatterns) {
       const match = headers.find(header => pattern.test(header));
@@ -83,16 +94,16 @@ const CsvPreview = () => {
       }
     }
 
-    // if no SMILES column matching the patterns is found, try to identify by SMILES string characteristics
+    // If no SMILES column matching the patterns is found, try to identify by SMILES string characteristics
     if (!detectedSmilesColumn) {
       const possibleSmilesColumns = headers.filter(header => {
-        // smiles typically contains these special characters
+        // SMILES typically contains these special characters
         const smilesChars = ['C', 'c', 'N', 'O', '=', '#', '(', ')', '[', ']'];
         const samples = data.slice(0, Math.min(5, data.length));
 
         return samples.every(row => {
           const value = String(row[header] || '');
-          // smiles are typically strings with specific characters and moderate length
+          // SMILES are typically strings with specific characters and moderate length
           return typeof value === 'string' &&
                  value.length > 5 &&
                  value.length < 200 &&
@@ -112,13 +123,35 @@ const CsvPreview = () => {
   };
 
   useEffect(() => {
+    let id = location.state?.dataset_id;
+    if (!id && location.state?.fileUrl) {
+      // Try to find from recentFiles
+      const recent = JSON.parse(localStorage.getItem("recentFiles") || "[]");
+      const found = recent.find(f => f.fileUrl === location.state.fileUrl);
+      if (found && found.dataset_id) {
+        id = found.dataset_id;
+      }
+    }
+    if (id) {
+      setDatasetId(id);
+    } else {
+      message.error('Dataset ID not detected, please re-upload the file');
+      setTimeout(() => navigate("/"), 1500); // Fallback to home page
+      return;
+    }
     if (fileUrl) {
+      setLoading(true);
       fetch(fileUrl)
-        .then((response) => response.text())
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('Failed to fetch CSV file');
+          }
+          return response.text();
+        })
         .then((csvText) => {
           const parsedResult = Papa.parse(csvText, {
             header: true,
-            dynamicTyping: true // automatically convert numeric strings to numbers
+            dynamicTyping: true
           });
           const filteredData = parsedResult.data.filter(
             (row) => Object.keys(row).length > 1
@@ -126,10 +159,10 @@ const CsvPreview = () => {
 
           setRawData(filteredData);
 
-          // get column names
+          // Get column names
           const headers = parsedResult.meta.fields || [];
 
-          // identify ID and SMILES columns
+          // Identify ID and SMILES columns
           if (headers.length > 0 && filteredData.length > 0) {
             const { idColumn, smilesColumn } = identifySpecialColumns(headers, filteredData);
 
@@ -139,26 +172,40 @@ const CsvPreview = () => {
 
             console.log("Detected ID column:", idColumn);
             console.log("Detected SMILES column:", smilesColumn);
+            console.log("Dataset ID:", id);
           }
         })
-        .catch((error) => console.error("Error loading CSV:", error));
+        .catch((error) => {
+          console.error("Error loading CSV:", error);
+          message.error('Failed to load CSV file: ' + error.message);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     }
-  }, [fileUrl]);
+  }, [fileUrl, location.state]);
 
-  const handleRowClick = (row, index) => {
-    setSelectedRowIndex(index);
+  const handleRowClick = async (row, index) => {
+    const molecule_id = row[idColumn];
+    const filename = location.state?.fileUrl?.split("/").pop();
+
+    if (!datasetId) {
+      message.error('Dataset ID does not exist, please re-upload the file');
+      return;
+    }
 
     navigate(`/editor/${index}`, {
       state: {
         smiles: row[smilesColumn],
         fromCsv: true,
         moleculeId: index,
-        moleculeName: row[idColumn] || `Compound-${index}`,
+        moleculeName: molecule_id || `Compound-${index}`,
         sourceData: row,
         allData: rawData,
         idColumn: idColumn,
         smilesColumn: smilesColumn,
-        filename: location.state?.fileUrl?.split("/").pop()
+        filename: filename,
+        dataset_id: datasetId
       }
     });
   };
@@ -176,7 +223,7 @@ const CsvPreview = () => {
     <span className="home-label">Homepage</span>
   </button>
 
-  {/* My Structures button */}
+  {/* My Structures button */}
   <button
     className="avatar-button"
     onClick={(e) => {

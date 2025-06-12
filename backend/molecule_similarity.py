@@ -1,6 +1,10 @@
+import sqlite3
+import json
+
 from rdkit import Chem, DataStructs
 from rdkit.Chem.rdFingerprintGenerator import GetMorganGenerator
 import pandas as pd
+
 
 def compute_similarity(fp1, fp2, metric="Tanimoto"):
     """Compute similarity based on the chosen metric."""
@@ -21,69 +25,72 @@ def compute_similarity(fp1, fp2, metric="Tanimoto"):
 
 
 
-def similarity_search(query_smiles, filename, similarity_metric='Tanimoto'):
+def similarity_search(query_smiles, dataset_id, similarity_metric='Tanimoto'):
     """
     Computes similarity between a query molecule and all molecules in the dataset.
 
     Parameters:
         query_smiles (str): The SMILES string of the query molecule.
-        filename (str): The CSV file containing compound IDs, SMILES, and other properties.
+        dataset_id (int): The dataset id in the database.
         similarity_metric (str): The similarity metric to use (default: tanimoto).
 
     Returns:
         pd.DataFrame: A DataFrame with all dataset properties and similarity scores.
     """
-    # Load dataset from CSV
-    dataset_df = pd.read_csv(f"data/{filename}")
+    print(f"[DEBUG] dataset_id: {dataset_id}")
+    print(f"[DEBUG] query_smiles: {query_smiles}")
+    conn = sqlite3.connect('data/molecular_annotate_V2.db')
+    df = pd.read_sql_query(
+        "SELECT DISTINCT molecule_id as cmpd_id, smiles, property FROM compound WHERE dataset_id=?",
+        conn,
+        params=(dataset_id,)
+    )
+    conn.close()
+    print(f"[DEBUG] df rows: {len(df)}")
 
-    # # Normalize column names to lowercase for case-insensitive matching
-    # dataset_df.columns = [col.lower() for col in dataset_df.columns]
+    # Expand the property field
+    property_dicts = []
+    for prop in df['property']:
+        try:
+            property_dicts.append(json.loads(prop) if prop else {})
+        except Exception:
+            property_dicts.append({})
+    property_df = pd.DataFrame(property_dicts)
+    df = pd.concat([df.drop(columns=['property']), property_df], axis=1)
 
-    # Convert query SMILES to an RDKit molecule
     query_mol = Chem.MolFromSmiles(query_smiles)
     if query_mol is None:
+        print("[ERROR] Invalid query SMILES string!")
         raise ValueError("Invalid query SMILES string")
 
-    # Generate fingerprint for the query molecule using Morgan Generator
     gen = GetMorganGenerator(radius=2)
     query_fp = gen.GetFingerprint(query_mol)
 
     results = []
-    # Iterate through the dataset and compute similarity
-    for _, row in dataset_df.iterrows():
-        target_smiles = row.get("SMILES")
+    df.columns = [col.lower() for col in df.columns]
+    for _, row in df.iterrows():
+        target_smiles = row.get("smiles")
         target_id = row.get("cmpd_id")
-
-        # Convert target SMILES to RDKit molecule
         target_mol = Chem.MolFromSmiles(target_smiles)
+        print(f"[DEBUG] target_id: {target_id}, smiles: {target_smiles}, can_parse: {target_mol is not None}")
         if target_mol is None:
-            continue  # Skip invalid SMILES
-
-        # Generate fingerprint for target molecule
+            continue
         target_fp = gen.GetFingerprint(target_mol)
-
-        # Compute similarity using the chosen metric
         try:
             similarity = compute_similarity(query_fp, target_fp, similarity_metric)
         except Exception as e:
             print(f"Error computing similarity for {target_id}: {e}")
             continue
-
-        # Create result entry with all dataset properties
         result_entry = row.to_dict()
         result_entry["similarity"] = similarity
         results.append(result_entry)
 
-    # If no results, return empty DataFrame
+    print(f"[DEBUG] results count: {len(results)}")
     if not results:
         return pd.DataFrame()
-
-    # Convert results to DataFrame and sort by similarity score
     results_df = pd.DataFrame(results)
     results_df = results_df.sort_values(by="similarity", ascending=False)
-
-    # Reorder columns: Move similarity_score to the beginning for better readability
+    results_df = results_df.drop_duplicates(subset=["cmpd_id", "smiles"])
     columns = ["similarity"] + [col for col in results_df.columns if col != "similarity"]
     results_df = results_df[columns]
-    # Return all results
     return results_df

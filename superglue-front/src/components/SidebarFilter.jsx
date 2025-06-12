@@ -13,22 +13,31 @@ const SidebarFilter = ({
   currentSmiles,
   isLoading
 }) => {
-  // Initial default ranges - these will be updated with actual data
-  const defaultRanges = {
-    similarity: [0, 1],
-    binary_occ: [-1, 5],
-    cont_occ: [0, 1],
-    low_gsh_prob: [0, 1],
-    med_gsh_prob: [0, 1],
-    high_gsh_prob: [0, 1],
-    selectivity: [0, 1]
+  // Dynamically generate defaultRanges
+  const getDynamicRanges = (searchResults) => {
+    if (!Array.isArray(searchResults) || searchResults.length === 0) return {};
+    const first = searchResults[0];
+    const ranges = {};
+    Object.keys(first).forEach(key => {
+      // Only process numeric fields
+      const values = searchResults.map(r => r[key]).filter(v => typeof v === 'number' || (!isNaN(parseFloat(v)) && v !== null && v !== undefined));
+      if (values.length > 0) {
+        const nums = values.map(v => typeof v === 'number' ? v : parseFloat(v));
+        const min = Math.min(...nums);
+        const max = Math.max(...nums);
+        // Add a small buffer to max to avoid boundary issues
+        const buffer = (max - min) * 0.05;
+        ranges[key] = [min, max + (buffer || 0.1)];
+      }
+    });
+    return ranges;
   };
 
   // Initialize filter ranges based on properties
-  const [filterRanges, setFilterRanges] = useState(defaultRanges);
+  const dynamicRanges = getDynamicRanges(searchResults);
 
   // Current active filter values
-  const [activeFilters, setActiveFilters] = useState({...defaultRanges});
+  const [activeFilters, setActiveFilters] = useState({...dynamicRanges});
 
   // Enable/disable state for each filter
   const [enabledFilters, setEnabledFilters] = useState({
@@ -74,18 +83,10 @@ const SidebarFilter = ({
       });
 
       // Update filter ranges
-      setFilterRanges(prev => {
-        const newRanges = {...prev, ...ranges};
-        console.log("New sidebar filter ranges:", newRanges);
-        return newRanges;
-      });
-
-      // Also update active filters with the same ranges
-      setActiveFilters(prev => {
-        const newFilters = {...prev, ...ranges};
-        console.log("New sidebar active filters:", newFilters);
-        return newFilters;
-      });
+      setActiveFilters(prev => ({
+        ...prev,
+        ...ranges
+      }));
     }
   }, [searchResults]);
 
@@ -131,7 +132,7 @@ const SidebarFilter = ({
     });
 
     // Reset active filters to full ranges
-    setActiveFilters({...filterRanges});
+    setActiveFilters({...dynamicRanges});
 
     // Call the clear callback
     onClearFilters();
@@ -184,7 +185,7 @@ const SidebarFilter = ({
 
       <Collapse defaultActiveKey={['ranges']} ghost>
         <Panel header={<Text strong>Property Ranges</Text>} key="ranges">
-          {Object.keys(filterRanges).map(property => (
+          {Object.keys(dynamicRanges).map(property => (
             <div key={property} style={{ marginBottom: 20 }}>
               <Row align="middle" style={{ marginBottom: 4 }}>
                 <Col span={16}>
@@ -206,8 +207,8 @@ const SidebarFilter = ({
                 <Col span={18}>
                   <Slider
                     range
-                    min={filterRanges[property][0]}
-                    max={filterRanges[property][1]}
+                    min={dynamicRanges[property][0]}
+                    max={dynamicRanges[property][1]}
                     step={getStep(property)}
                     value={activeFilters[property]}
                     onChange={(values) => handleFilterChange(property, values)}
@@ -221,8 +222,8 @@ const SidebarFilter = ({
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <InputNumber
                       style={{ width: 60 }}
-                      min={filterRanges[property][0]}
-                      max={filterRanges[property][1]}
+                      min={dynamicRanges[property][0]}
+                      max={dynamicRanges[property][1]}
                       step={getStep(property)}
                       value={activeFilters[property][0]}
                       onChange={(value) => handleFilterChange(property, [value, activeFilters[property][1]])}
