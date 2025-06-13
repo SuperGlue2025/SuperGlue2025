@@ -1099,7 +1099,7 @@ const generateSubstructureColumns = (results) => {
     }
   }, [selectedTab, moleculeId, location.state?.dataset_id]);
 
-  // 高亮点击
+  // Higlight selection
   const handleHighlightSelect = (highlight) => {
     const idx = savedHighlights.findIndex(h =>
       h.id === highlight.id ||
