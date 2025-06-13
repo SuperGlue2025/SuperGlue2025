@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools >=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name =  "superglue2025"
+version = "0.1.0"
+authors = [
+    {name = "Adrian He", email = "haoyuhe@uw.edu"}, 
+    {name = "Crystal Liu", email = "hongyan6@uw.edu"},
+    {name = "Zoe Williams", email = "zbyw@uw.edu"},
+    {name = "Eric Ying", email = "junyiy2@uw.edu"}
+]
+description = "FL94 capstone project package"
+readme = "README.md"
+dependencies = [
+	"flask>=3.1.0",
+ 	"flask_cors>=5.0.0",
+ 	"numpy>=2.1.3",
+	"pandas >= 2.2.3",
+	"matplotlib>=3.8.0",
+ 	"rdkit>=2024.9.5",
+  	"scipy>=1.15.1",
+   	"torch>=2.6.0",
+    	"torch-geometric>=2.6.1"
+]
+requires-python = ">= 3.8"
+license = {file = "LICENSE"}
+
+keywords = ["molecules", "chemistry", "pharamceutical chemistry", "chemical representations", 
+"drug discovery", "chemical compounds", "chemical structures", "molecular structures", "molecular similarity", 
+"molecule data", "molecule editing", "chemical editing"]
+
+[project.urls]
+Repository = "https://github.com/SuperGlue2025/SuperGlue2025"

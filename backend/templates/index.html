@@ -1,0 +1,242 @@
+<!--<!DOCTYPE html>-->
+<!--<html lang="en">-->
+<!--<head>-->
+<!--    <meta charset="UTF-8">-->
+<!--    <meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+<!--    <title>Compound Data</title>-->
+<!--    <style>-->
+<!--        table {-->
+<!--            border-collapse: collapse;-->
+<!--            width: 100%;-->
+<!--        }-->
+<!--        th, td {-->
+<!--            border: 1px solid #ddd;-->
+<!--            padding: 8px;-->
+<!--        }-->
+<!--        th {-->
+<!--            background-color: #f2f2f2;-->
+<!--            text-align: left;-->
+<!--        }-->
+<!--        tr:hover {-->
+<!--            background-color: #f5f5f5;-->
+<!--        }-->
+<!--    </style>-->
+<!--</head>-->
+<!--<body>-->
+<!--    <h1>Compound Data</h1>-->
+<!--    <table>-->
+<!--        <thead>-->
+<!--            <tr>-->
+<!--                <th>Compound ID</th>-->
+<!--                <th>SMILES</th>-->
+<!--                <th>Binary Occ</th>-->
+<!--                <th>Cont Occ</th>-->
+<!--                <th>Low GSH Prob</th>-->
+<!--                <th>Med GSH Prob</th>-->
+<!--                <th>High GSH Prob</th>-->
+<!--                <th>Selectivity</th>-->
+<!--            </tr>-->
+<!--        </thead>-->
+<!--        <tbody>-->
+<!--            &lt;!&ndash; use Jinja2 to render data &ndash;&gt;-->
+<!--            {% for compound in compounds %}-->
+<!--            <tr>-->
+<!--                <td>{{ compound.cmpd_id }}</td>-->
+<!--                <td>{{ compound.SMILES }}</td>-->
+<!--                <td>{{ compound.binary_occ }}</td>-->
+<!--                <td>{{ compound.cont_occ }}</td>-->
+<!--                <td>{{ compound.low_gsh_prob }}</td>-->
+<!--                <td>{{ compound.med_gsh_prob }}</td>-->
+<!--                <td>{{ compound.high_gsh_prob }}</td>-->
+<!--                <td>{{ compound.selectivity }}</td>-->
+<!--            </tr>-->
+<!--            {% endfor %}-->
+<!--        </tbody>-->
+<!--    </table>-->
+<!--</body>-->
+<!--</html>-->
+<!--<!DOCTYPE html>-->
+<!--<html lang="zh">-->
+<!--<head>-->
+<!--    <meta charset="UTF-8">-->
+<!--    <meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+<!--    <title>Ketcher 显示分子</title>-->
+<!--    &lt;!&ndash; Load ketcher-core first &ndash;&gt;-->
+<!--    <script src="https://unpkg.com/ketcher-core@1.1.0/dist/ketcher-core.js"></script>-->
+<!--    &lt;!&ndash; Then load ketcher-standalone &ndash;&gt;-->
+<!--    <script src="https://unpkg.com/ketcher-standalone@1.1.0/dist/ketcher-standalone.js"></script>-->
+<!--    &lt;!&ndash; And required styles &ndash;&gt;-->
+<!--    <link rel="stylesheet" href="https://unpkg.com/ketcher-react@1.1.0/dist/index.css">-->
+<!--</head>-->
+<!--<body>-->
+<!--    <button onclick="loadMolecule()">加载分子</button>-->
+<!--    <div id="ketcher-container" style="width: 800px; height: 600px;"></div>-->
+
+<!--    <script>-->
+<!--        let ketcher;-->
+
+<!--        window.onload = function () {-->
+<!--            try {-->
+<!--                console.log("正在初始化 Ketcher...");-->
+<!--                // Get the container element-->
+<!--                const container = document.getElementById('ketcher-container');-->
+<!--                // Create new ketcher instance-->
+<!--                ketcher = new window.Ketcher(container);-->
+<!--                console.log("Ketcher 初始化成功", ketcher);-->
+<!--            } catch (error) {-->
+<!--                console.error("Ketcher 初始化失败", error);-->
+<!--            }-->
+<!--        };-->
+
+<!--        async function loadMolecule() {-->
+<!--            try {-->
+<!--                if (!ketcher) {-->
+<!--                    console.error("Ketcher 未初始化");-->
+<!--                    return;-->
+<!--                }-->
+
+<!--                const response = await fetch('http://127.0.0.1:5001/api/convert_molecule', {-->
+<!--                    method: 'POST',-->
+<!--                    headers: { 'Content-Type': 'application/json' },-->
+<!--                    body: JSON.stringify({ smiles: 'CCO' })-->
+<!--                });-->
+
+<!--                const data = await response.json();-->
+<!--                console.log("后端返回数据：", data);-->
+
+<!--                if (data.mol_block) {-->
+<!--                    console.log("传递给 Ketcher 的 molfile:", data.mol_block);-->
+<!--                    // Try to render the molecule-->
+<!--                    await ketcher.UI.load(data.mol_block);-->
+<!--                } else {-->
+<!--                    alert("转换失败：" + data.error);-->
+<!--                }-->
+<!--            } catch (error) {-->
+<!--                console.error("请求错误:", error);-->
+<!--            }-->
+<!--        }-->
+<!--    </script>-->
+<!--</body>-->
+<!--</html>-->
+<!--<!DOCTYPE html>-->
+<!--<html lang="zh">-->
+<!--<head>-->
+<!--    <meta charset="UTF-8">-->
+<!--    <meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+<!--    <title>Ketcher with Flask</title>-->
+<!--    <script src="https://unpkg.com/ketcher@latest/dist/ketcher.min.js"></script>-->
+<!--    <link rel="stylesheet" href="https://unpkg.com/ketcher@latest/dist/ketcher.min.css">-->
+<!--    <style>-->
+<!--        #ketcher-container {-->
+<!--            width: 800px;-->
+<!--            height: 600px;-->
+<!--            border: 1px solid #ccc;-->
+<!--        }-->
+<!--    </style>-->
+<!--</head>-->
+<!--<body>-->
+<!--    <h2>Ketcher 化学结构编辑器</h2>-->
+<!--    <div id="ketcher-container"></div>-->
+<!--    <button onclick="loadMolfile()">加载 Molfile</button>-->
+
+<!--    <script>-->
+<!--        let ketcher;-->
+
+<!--        // 初始化 Ketcher-->
+<!--        document.addEventListener("DOMContentLoaded", async () => {-->
+<!--            ketcher = await Ketcher.create(document.getElementById("ketcher-container"));-->
+<!--        });-->
+
+<!--        // 从 Flask 后端获取 molfile 并加载到 Ketcher-->
+<!--        async function loadMolfile() {-->
+<!--            try {-->
+<!--                const response = await fetch('http://127.0.0.1:5001/api/convert_molecule');-->
+
+<!--                if (!response.ok) throw new Error("获取 Molfile 失败");-->
+
+<!--                const molfile = await response.text(); // Flask 返回的是纯文本-->
+<!--                ketcher.setMolecule(molfile);-->
+<!--            } catch (error) {-->
+<!--                console.error("加载 Molfile 失败:", error);-->
+<!--                alert("无法加载分子结构，请检查后端服务是否正常运行。");-->
+<!--            }-->
+<!--        }-->
+<!--    </script>-->
+<!--</body>-->
+<!--</html>-->
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ketcher with Flask</title>
+    <!-- 更新为 ketcher-standalone -->
+    <script src="https://unpkg.com/ketcher-standalone@2.13.0/dist/ketcher.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/ketcher-react@2.13.0/dist/index.css">
+    <style>
+        #ketcher-container {
+            width: 800px;
+            height: 600px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h2>Ketcher 化学结构编辑器</h2>
+    <div id="ketcher-container"></div>
+    <input type="text" id="smiles-input" placeholder="输入 SMILES，如 CCO">
+    <button onclick="loadMolfile()">加载 Molfile</button>
+
+    <script>
+        let ketcher;
+
+        // 修改初始化方式
+        window.onload = async function () {
+            try {
+                ketcher = await window.KetcherStandalone.create(
+                    document.getElementById("ketcher-container"),
+                    {
+                        staticResourcesUrl: 'https://unpkg.com/ketcher-standalone@2.13.0/dist/'
+                    }
+                );
+                console.log("Ketcher 初始化成功");
+            } catch (error) {
+                console.error("Ketcher 初始化失败:", error);
+            }
+        };
+
+        async function loadMolfile() {
+            const smiles = document.getElementById("smiles-input").value.trim();
+            if (!smiles) {
+                alert("请输入有效的 SMILES 字符串！");
+                return;
+            }
+
+            try {
+                const response = await fetch('http://127.0.0.1:5001/api/convert_molecule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ smiles })
+                });
+
+                if (!response.ok) throw new Error("获取 Molfile 失败");
+
+                const data = await response.json();
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                const molfile = data.mol_block;
+                if (ketcher) {
+                    await ketcher.setMolecule(molfile);
+                } else {
+                    console.error("Ketcher 没有被正确初始化！");
+                }
+            } catch (error) {
+                console.error("加载 Molfile 失败:", error);
+                alert("无法加载分子结构，请检查后端服务是否正常运行。");
+            }
+        }
+    </script>
+</body>
+</html>

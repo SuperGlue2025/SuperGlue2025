@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "rdkit": "^0.5.1"
+  }
+}

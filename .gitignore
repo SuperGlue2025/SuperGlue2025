@@ -1,0 +1,63 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+.DS_Store
+
+# Virtual environment
+*.venv
+Pipfile
+Pipfile.lock
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# ---- Node.js / Frontend ----
+node_modules/
+dist/
+build/
+.vite/
+.eslintcache
+
+# Dependency lock files
+package-lock.json
+yarn.lock
+
+# ---- Logs & Temporary Files ----
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.swp
+*.swo
+
+# ---- Environment Variables ----
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# ---- OS Specific ----
+Thumbs.db
+.DS_Store
+*.bak
+*.tmp
+
+# ---- IDE / Editor ----
+.vscode/
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+*.vscode/
+
+# ---- Miscellaneous ----
+*.csv~
+*.sqlite
+*.db
+__snapshots__/
+
