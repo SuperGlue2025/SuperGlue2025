@@ -96,6 +96,8 @@ The Annotation Page is where most of your work happens. Here, you can visualize,
 
 - Displays the properties from your dataset for the selected compound.
 
+![Property Table Example](images/property_table.png)
+
 ### 🟡 Highlights and 💬 Text Annotations
 
 - Select atoms or substructures to visually mark them of interest in the compound.
@@ -112,6 +114,8 @@ The Annotation Page is where most of your work happens. Here, you can visualize,
 
 > ⚠️ Note: Currently, saved highlights and annotations cannot be edited or deleted. This feature is planned for a future update.
 
+![Annotate Guide](images/annotate_guide.png)
+
 ### 🧩 Substructure Matching
 
 - Search for compounds that contain a specific substructure you highlighted.
@@ -120,17 +124,26 @@ The Annotation Page is where most of your work happens. Here, you can visualize,
   2. Click on the **Substructure Matching** tool below on the right sidebar.
   3. Returns a list of compounds that contains the selected substructure.
 
+![Substructure Matching Example](images/substructure_matching_example.png)
+
 ### 🔎 Similarity Search
 
 - Search for similar compounds using different similarity metrics (Tanimoto, Russel,Dice, Sokal, Kulczynski, McConnaughey, Cosine).
 - Return a list of similar compounds based on the selected metric.
 - Step-by-step guide:
-  1. Select a compound from the **Summary Page**.
-  2. Click on the **Similarity Search** on the left sidebar.
-  3. Choose a **similarity metric** from the dropdown menu.
-  4. (Optional) Adjust the **threshold** for similarity.
-  5. Click "Search" to find similar compounds.
-  6. View results in the table below.
+  1. Click on the **Similarity Search** on the left sidebar.
+  2. Choose a **similarity metric** from the dropdown menu.
+  3. (Optional) Adjust the **threshold** for similarity *(Planned)*.
+  4. Click **Search** to find similar compounds.
+  5. View results in the table below.
+  6. Click **View** to see the compound. *(Planned)*.
+  7. Apply **filters** to narrow down results based on properties.
+
+> ⚠️ Note: The threshold before the search is yet to be implemented, so it will return all similar compounds. The view button is also not yet implemented.
+
+![Similarity Search Example](images/similarity_search.png)
+![Similarity Search Results Example](images/similarity_search_results.png)
+![Similarity Search Filter Example](images/similarity_search_filter.png)
 
 ### 🧮 ADMET Property Calculation
 
@@ -146,19 +159,26 @@ The Annotation Page is where most of your work happens. Here, you can visualize,
 
 > 💡 The predicted values and charts are stored automatically for future use.
 
+![ADMET Properties Example](images/admet_properties_example.png)
+![ADMET Distribution Example](images/admet_distribution_example.png)
+
 ### 🌐 3D Visualization
 
 - Visualize molecular structures in an interactive 3D viewer
 - Rotate, zoom, and explore molecular geometries directly in your browser
 - View structures automatically generated from SMILES
 - For more accurate geometries (e.g. conformers), upload a custom SDF file
+- Use the model style dropdown to switch between visualization styles
 - Step-by-step guide:
   1. Click on **3D Visualization** in the left sidebar.
   2. If no SDF is uploaded, click **SMILES to 3D** and it will generate a 3D structure from the SMILES.
   3. To upload a custom SDF, click **Load SDF** and select your file.
   4. The viewer will update to show the new structure.
+  5. Select a model style from the dropdown menu
 
 > 💡 If an SDF was previously uploaded for a compound, it will be automatically loaded when revisiting.
+
+![3D Visualization Example](images/3d_viewer.png)
 
 ### 📥 Export *(Planned)*
 

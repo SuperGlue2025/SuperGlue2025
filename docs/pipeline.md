@@ -99,7 +99,7 @@ All entries are linked to the dataset and compound IDs.
 
 **Multiple annotations per molecule** are supported via the `molecule_structures` table.
 
-> For more details, see the [Data Storage and Database Design](#-data-storage-and-database-design) section below.
+> For more details, see the [Data Storage and Database Design](#data-storage-and-database-design) section below.
 
 #### Re-Rendering
 
@@ -213,7 +213,7 @@ Super-Glue enables users to find molecules that are structurally similar to a se
 
 ## 3D Visualization
 
-Super-Glue supports interactive 3D rendering of molecules using **3Dmol.js**. This feature helps chemists inspect spatial structure and geometry.
+SuperGlue supports interactive 3D rendering of molecules using **3Dmol.js**. This feature helps chemists inspect spatial structure and geometry.
 
 ### How it Works
 
@@ -230,7 +230,7 @@ Super-Glue supports interactive 3D rendering of molecules using **3Dmol.js**. Th
 
 ## ADMET Property Prediction
 
-Super-Glue integrates **ADMET-ai**, an open-source machine learning platform trained on datasets from the **Therapeutics Data Commons**, to predict drug-like properties.
+SuperGlue integrates **ADMET-ai**, an open-source machine learning platform trained on datasets from the **Therapeutics Data Commons**, to predict drug-like properties.
 
 ### How it Works
 
@@ -252,7 +252,7 @@ Super-Glue uses a relational SQL database to manage uploaded molecules, annotati
 
 ### ER Diagram
 
-![ER Diagram]()
+![ER Diagram](images/database_er.png)
 
 ### Tables
 
@@ -282,7 +282,7 @@ Super-Glue uses a relational SQL database to manage uploaded molecules, annotati
 
 #### `sdf`
 
-- Stores user-uploaded 3D structures (e.g., `.sdf` files) as **`TEXT`**
+- Stores user-uploaded 3D structures (e.g., .sdf files) as **`TEXT`**
 - Allows molecules to be rendered in 3D (via `3Dmol.js`)
 - Each record is tied to a specific molecule and dataset
 
