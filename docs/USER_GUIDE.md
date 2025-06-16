@@ -136,7 +136,7 @@ The Annotation Page is where most of your work happens. Here, you can visualize,
   3. (Optional) Adjust the **threshold** for similarity *(Planned)*.
   4. Click **Search** to find similar compounds.
   5. View results in the table below.
-  6. Click **View** to see the compound. *(Planned)*.
+  6. Click **View** to see the compound.
   7. Apply **filters** to narrow down results based on properties.
 
 > ⚠️ Note: The threshold before the search is yet to be implemented, so it will return all similar compounds. The view button is also not yet implemented.
@@ -195,6 +195,8 @@ The Annotation Page is where most of your work happens. Here, you can visualize,
 | Table content not showing correctly | Try scrolling horizontally or adjust your browser zoom level. |
 | No way back? | Use the browser's back button |
 | Highlight doesn't save | Check if you clicked "Capture Selection"; Make sure not to use Ketcher highlight function. Use Ketcher select tool instead. |
+| Similarity search throws an error when running the function. | This may happen when multiple users share the same backend state. Go back to the homepage and re-upload the dataset to reset the session. |
+| "View" button in similarity search results causes incorrect behavior — the molecule previewed in Ketcher is not synced with the properties on the right, and related functions like View Highlights or Substructure Matching may break or show errors. | This happens because the molecule stays loaded in Ketcher but does not update backend references. To fix: go to the Summary Page and reselect the correct compound from the table. Avoid using other features before reselecting. |
 | Substructure matching not working | Try a more general highlight or ensure the substructure is valid. |
 | Long loading times | Large datasets may take longer. |
 
