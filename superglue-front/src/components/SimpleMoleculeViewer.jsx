@@ -13,7 +13,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Card, Button, Select, Row, Col, message, Space, Upload } from 'antd';
-import { UploadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { UploadOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -33,31 +33,8 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath, moleculeId, isActive = tru
   const [currentSmiles, setCurrentSmiles] = useState('');
   const [moleculeLoaded, setMoleculeLoaded] = useState(false);
 
-  // Track how many times 3D structure load is attempted
-  const [loadAttemptCount, setLoadAttemptCount] = useState(0);
-  const loadAttemptRef = useRef(0);
-
   // Get a valid molecule ID
   const effectiveId = moleculeId || `temp_molecule_${Date.now()}`;
-
-  // Listen for changes to tab activation
-  useEffect(() => {
-    console.log(`[DEBUG] 3D Tab Active State changed to: ${isActive}`);
-    if (isActive) {
-      const newCount = loadAttemptRef.current + 1;
-      loadAttemptRef.current = newCount;
-      setLoadAttemptCount(newCount);
-      console.log(`[DEBUG] Tab activated, increasing load attempt to ${newCount}`);
-    }
-  }, [isActive]);
-
-  // React to load attempt changes
-  useEffect(() => {
-    if (loadAttemptCount > 0 && viewer && isActive) {
-      console.log(`[DEBUG] Load attempt #${loadAttemptCount}, forcing database load`);
-      loadStructureFromDatabase(effectiveId);
-    }
-  }, [loadAttemptCount, viewer, isActive]);
 
   // Initialize 3DMol.js library
   useEffect(() => {
@@ -93,13 +70,6 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath, moleculeId, isActive = tru
           console.log('[DEBUG] 3D viewer created successfully');
           setViewer(viewerInstance);
           viewerInstance.render();
-
-          if (isActive) {
-            const newCount = loadAttemptRef.current + 1;
-            loadAttemptRef.current = newCount;
-            setLoadAttemptCount(newCount);
-            console.log(`[DEBUG] Viewer created, setting load attempt to ${newCount}`);
-          }
         } else {
           console.error('[ERROR] Failed to create 3DMol viewer instance');
           message.error('Failed to create 3D viewer');
@@ -323,9 +293,6 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath, moleculeId, isActive = tru
         if (data.success) {
           if (data.db_saved) {
             message.success(`3D structure saved to database with ID: ${effectiveId}`);
-            const newCount = loadAttemptRef.current + 1;
-            loadAttemptRef.current = newCount;
-            setLoadAttemptCount(newCount);
           } else {
             message.warning('Structure displayed but not saved to database');
           }
@@ -343,7 +310,6 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath, moleculeId, isActive = tru
     reader.readAsText(file);
     return false;
   };
-
 
   const applyViewStyle = (style) => {
     if (!viewer) return;
@@ -373,14 +339,6 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath, moleculeId, isActive = tru
     if (viewer) {
       applyViewStyle(value);
     }
-  };
-
-
-  const handleForceReload = () => {
-    console.log('[DEBUG] Manual reload requested');
-    const newCount = loadAttemptRef.current + 1;
-    loadAttemptRef.current = newCount;
-    setLoadAttemptCount(newCount);
   };
 
   return (
@@ -457,7 +415,7 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath, moleculeId, isActive = tru
                 type="primary"
                 onClick={updateMoleculeFrom2D}
                 loading={isLoading}
-                icon={<ReloadOutlined />}
+                icon={null}
                 title="Convert current 2D structure to 3D (preview only)"
               >
                 SMILES to 3D
@@ -475,14 +433,6 @@ const SimpleMoleculeViewer = ({ ketcher, ketcherPath, moleculeId, isActive = tru
                   Load SDF
                 </Button>
               </Upload>
-              <Button
-                type="default"
-                onClick={handleForceReload}
-                loading={isLoading}
-                title="Manually reload structure from database"
-              >
-                Reload
-              </Button>
               <Select
                 value={viewStyle}
                 onChange={handleViewStyleChange}
