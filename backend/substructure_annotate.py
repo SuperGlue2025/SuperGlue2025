@@ -7,7 +7,10 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'data', 'molecular_annotate_V2
 
 
 def init_db():
-    """Initialize database with substructure table if it doesn't exist"""
+    """
+    Initialize the database with required tables and indexes for substructure annotation.
+    Creates tables for datasets, substructure highlights, molecule structures, and compound information if they do not exist.
+    """
     # Make sure data directory exists
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
@@ -60,7 +63,7 @@ def init_db():
             FOREIGN KEY(dataset_id) REFERENCES dataset(dataset_id)
         )
     ''')
-    # 新增唯一索引
+    # Add unique index
     cursor.execute('''
         CREATE UNIQUE INDEX IF NOT EXISTS idx_compound_unique ON compound(dataset_id, smiles)
     ''')
@@ -71,7 +74,20 @@ def init_db():
 
 def save_substructure(dataset_id, molecule_id, smiles, highlighted_atoms, highlighted_bonds=None,
                       fragment_smiles=None, fragment_smarts=None, annotation_text=None):
-    """Save highlighted substructure information and annotation to database"""
+    """
+    Save highlighted substructure information and annotation to the database.
+    Args:
+        dataset_id (int): Dataset ID.
+        molecule_id (str): Molecule ID.
+        smiles (str): SMILES string of the molecule.
+        highlighted_atoms (list): List of highlighted atom indices.
+        highlighted_bonds (list, optional): List of highlighted bond indices.
+        fragment_smiles (str, optional): SMILES of the fragment.
+        fragment_smarts (str, optional): SMARTS of the fragment.
+        annotation_text (str, optional): Annotation text.
+    Returns:
+        dict: Result with success status, substructure ID, and message.
+    """
     try:
         # Ensure DB is initialized
         init_db()
@@ -113,7 +129,14 @@ def save_substructure(dataset_id, molecule_id, smiles, highlighted_atoms, highli
 
 
 def get_molecule_highlights(molecule_id, dataset_id=None):
-    """Retrieve all highlighted substructures for a specific molecule and dataset."""
+    """
+    Retrieve all highlighted substructures for a specific molecule and dataset.
+    Args:
+        molecule_id (str): Molecule ID.
+        dataset_id (int, optional): Dataset ID.
+    Returns:
+        dict: Result with success status and list of highlights.
+    """
     try:
         # Ensure the database is initialized
         init_db()
@@ -125,7 +148,7 @@ def get_molecule_highlights(molecule_id, dataset_id=None):
         conn.row_factory = sqlite3.Row  # Return results as dictionaries
         cursor = conn.cursor()
 
-        # 如果molecule_id带有前缀，去掉前缀后再查询
+        # If molecule_id has a prefix, remove the prefix before querying
         if molecule_id.startswith('cmpd_') or molecule_id.startswith('Compound-'):
             molecule_id = molecule_id.replace('cmpd_', '').replace('Compound-', '')
 
@@ -133,7 +156,7 @@ def get_molecule_highlights(molecule_id, dataset_id=None):
             try:
                 dataset_id = int(dataset_id)
             except Exception:
-                pass  # 保持原样，防止异常
+                pass  
             cursor.execute('''
             SELECT * FROM molecule_substructures
             WHERE molecule_id = ? AND dataset_id = ?
@@ -179,7 +202,17 @@ def get_molecule_highlights(molecule_id, dataset_id=None):
 
 
 def save_molecule_structure(molecule_id, sdf_content, smiles=None, is_optimized=True, source='upload'):
-    """Save molecule structure (SDF) to database"""
+    """
+    Save molecule structure (SDF) to the database.
+    Args:
+        molecule_id (str): Molecule ID.
+        sdf_content (str): SDF file content.
+        smiles (str, optional): SMILES string.
+        is_optimized (bool, optional): Whether the structure is optimized.
+        source (str, optional): Source of the structure.
+    Returns:
+        dict: Result with success status and structure ID.
+    """
     try:
         # Ensure DB is initialized
         init_db()

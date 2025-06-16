@@ -5,6 +5,15 @@ import os
 
 
 class MoleculeAnnotationService:
+    """
+    Service class for managing molecule annotations and compound data.
+
+    Attributes:
+        compounds_df (pd.DataFrame or None): DataFrame containing loaded compounds.
+        annotations (dict): Dictionary mapping compound IDs to annotation data.
+        data_folder (str): Path to the data folder containing CSV files.
+        current_file (str or None): Currently loaded file name.
+    """
     def __init__(self):
         self.compounds_df = None
         self.annotations = {}
@@ -55,7 +64,11 @@ service = MoleculeAnnotationService()
 
 
 def get_compounds():
-    """Get all compounds"""
+    """
+    Get all compounds from the currently loaded DataFrame, or load the latest CSV if not loaded.
+    Returns:
+        Response: Flask JSON response with all compounds or error message.
+    """
     if service.compounds_df is None:
         # Get the latest CSV file
         csv_path = service.get_latest_csv()
@@ -70,7 +83,13 @@ def get_compounds():
 
 
 def get_compound(cmpd_id):
-    """Get specific compound details"""
+    """
+    Get details for a specific compound by its compound ID.
+    Args:
+        cmpd_id (str): The compound ID to look up.
+    Returns:
+        Response: Flask JSON response with compound details or error message.
+    """
     if service.compounds_df is None:
         # Get the latest CSV file
         csv_path = service.get_latest_csv()
@@ -84,6 +103,15 @@ def get_compound(cmpd_id):
     return jsonify(compound[0] if compound else {})
 
 def auto_complete_ring_bonds(mol, atom_indices, bond_indices):
+    """
+    Automatically complete ring bonds for a selected set of atoms and bonds in a molecule.
+    Args:
+        mol (rdkit.Chem.Mol): The molecule object.
+        atom_indices (list): List of selected atom indices.
+        bond_indices (list): List of selected bond indices.
+    Returns:
+        list: Completed list of bond indices including inferred ring bonds.
+    """
     atom_set = set(atom_indices)
     bond_set = set(bond_indices)
     completed_bonds = list(bond_indices)
@@ -109,6 +137,12 @@ def get_smarts_smiles(mol, atom_indices, bond_indices):
     """
     Generate SMARTS and SMILES representations of the fragment
     based on the molecule object and selected atoms/bonds.
+    Args:
+        mol (rdkit.Chem.Mol): The molecule object.
+        atom_indices (list): List of selected atom indices.
+        bond_indices (list): List of selected bond indices.
+    Returns:
+        tuple: (fragment_smiles, fragment_smarts) as strings, or (None, None) on error.
     """
     if not mol:
         print("Could not create molecule from molfile")

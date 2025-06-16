@@ -1,3 +1,17 @@
+/**
+ * Details Component
+ *
+ * This component displays detailed information for a specific molecule, including its structure image and SMILES string.
+ * It provides navigation between molecules, and links to the homepage and canvas editor.
+ *
+ * Props:
+ *   - isLoggedIn: Whether the user is logged in
+ *   - toggleLoginModal: Function to toggle the login modal
+ *   - toggleDropdown: Function to toggle the user dropdown
+ *   - showDropdown: Whether the dropdown is shown
+ *   - handleLogout: Function to handle user logout
+ */
+
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaArrowRight } from "react-icons/fa";
@@ -16,6 +30,9 @@ const Details = ({ isLoggedIn, toggleLoginModal, toggleDropdown, showDropdown, h
   const currentId = parseInt(id, 10);
 
   useEffect(() => {
+    /**
+     * Fetch the molecule image from the backend when id or filename changes.
+     */
     const fetchImage = async () => {
       if (!filename) {
         console.error("Filename is missing!");
@@ -39,6 +56,11 @@ const Details = ({ isLoggedIn, toggleLoginModal, toggleDropdown, showDropdown, h
   }, [id, filename]); // listen for changes in id and filename
   
 
+  /**
+   * Handle navigation to a new molecule by index.
+   * Prevents out-of-bounds navigation.
+   * @param {number} newId - The index of the new molecule to navigate to.
+   */
   const handleNavigation = (newId) => {
     if (newId < 0 || newId >= totalRows) return; // avoid out of bounds
   
@@ -56,12 +78,12 @@ const Details = ({ isLoggedIn, toggleLoginModal, toggleDropdown, showDropdown, h
     <div className="app-container">
       <header className="app-header">
         <div className="user-info">
-          <button className="avatar-button" onClick={() => navigate("/")}>
+          <button className="avatar-button" onClick={() => navigate("/")}> 
             <img src="/assets/home.png" alt="Home" className="home-icon" />
             <span className="home-label">Homepage</span>
           </button>
 
-          <button className="avatar-button" onClick={() => navigate("/editor")}>
+          <button className="avatar-button" onClick={() => navigate("/editor")}> 
             <img src="/assets/canvas.png" alt="Canvas" className="Canvas-icon" />
             <span className="Canvas-label">Canvas</span>
           </button>

@@ -1,3 +1,10 @@
+/**
+ * AdmetResult Component
+ * 
+ * This component displays the predicted ADMET properties for a given set of SMILES strings.
+ * It groups the properties into categories and allows users to view distribution plots for each property.
+ */
+
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api.js'; 
@@ -67,16 +74,16 @@ const AdmetResult = () => {
   const navigate = useNavigate();
   const { smiles, predictions, allSmiles } = state || {};
   
-  console.log('Received state:', state); 
-  console.log('All SMILES:', allSmiles); 
-  console.log('Predictions:', predictions); 
+  console.log('Received state:', state); // Debug log
+  console.log('All SMILES:', allSmiles); // Debug log
+  console.log('Predictions:', predictions); // Debug log
   const data = Array.isArray(predictions) ? predictions : [predictions];
-  console.log('Processed data:', data); 
+  console.log('Processed data:', data); // Debug log
 
   // 1) Grouping, skipping any percentile keys
   const grouped = {};
   data.forEach(compoundData => {
-    if (!compoundData) return; 
+    if (!compoundData) return; // Skip empty data
     Object.entries(compoundData).forEach(([k, v]) => {
       if (R_PCTL.test(k)) return;             // skip drugbank percentiles
       const g = getGroup(k);
@@ -97,37 +104,37 @@ const AdmetResult = () => {
   const [loading, setLoading] = useState(false);
 
   // 2) fetch & show the plot
-const viewPlot = async (property) => {
-  setLoading(true);
-  try {
-    // smile name
-    const filename = state.filename;  
-    // current smiles
-    const highlightSmile = Array.isArray(smiles) ? smiles[0] : smiles;
+  const viewPlot = async (property) => {
+    setLoading(true);
+    try {
+      // smile name
+      const filename = state.filename;  
+      // current smiles
+      const highlightSmile = Array.isArray(smiles) ? smiles[0] : smiles;
 
-    const response = await apiFetch('/api/dataset_admet_plot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filename,
-        property,
-        highlight_smiles: highlightSmile
-      })
-    });
-    const data = await response.json();
-    if (data.success) {
-      setModalImage(data.plot);
-      setModalTitle(`${property.replace(/_/g,' ')} Distribution`);
-      setModalVisible(true);
-    } else {
-      throw new Error(data.message);
+      const response = await apiFetch('/api/dataset_admet_plot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename,
+          property,
+          highlight_smiles: highlightSmile
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setModalImage(data.plot);
+        setModalTitle(`${property.replace(/_/g,' ')} Distribution`);
+        setModalVisible(true);
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (err) {
+      message.error(`Plot error: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    message.error(`Plot error: ${err.message}`);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div
@@ -206,7 +213,7 @@ const viewPlot = async (property) => {
         onCancel={() => setModalVisible(false)}
         bodyStyle={{ textAlign:'center' }}
       >
-        {modalImage && <img src={modalImage} alt={modalTitle} style={{ maxWidth:'100%' }}/>}
+        {modalImage && <img src={modalImage} alt={modalTitle} style={{ maxWidth:'100%' }}/>} 
       </Modal>
     </div>
   );

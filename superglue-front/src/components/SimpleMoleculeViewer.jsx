@@ -1,3 +1,16 @@
+/**
+ * SimpleMoleculeViewer Component
+ *
+ * This component provides a 3D molecule viewer using 3DMol.js, supporting SDF/SMILES structure display,
+ * style switching, file upload, and integration with Ketcher for 2D-to-3D conversion.
+ *
+ * Props:
+ *   - ketcher: Ketcher instance for 2D structure editing
+ *   - ketcherPath: Path to the Ketcher editor
+ *   - moleculeId: Molecule identifier
+ *   - isActive: Whether the viewer tab is active (default: true)
+ */
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Card, Button, Select, Row, Col, message, Space, Upload } from 'antd';
 import { UploadOutlined, ReloadOutlined } from '@ant-design/icons';

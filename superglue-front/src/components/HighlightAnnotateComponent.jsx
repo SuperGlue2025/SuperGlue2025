@@ -1,3 +1,20 @@
+/**
+ * HighlightAnnotateComponent
+ *
+ * This component displays and manages saved highlights and annotations for a molecule.
+ * Users can sort, select, edit, and delete highlights, and perform substructure matching.
+ *
+ * Props:
+ *   - moleculeId: The ID of the molecule
+ *   - filename: The source filename
+ *   - dataset_id: The dataset identifier
+ *   - savedHighlights: Array of saved highlight objects
+ *   - currentHighlightIndex: Index of the currently selected highlight
+ *   - onHighlightSelect: Callback when a highlight is selected
+ *   - onPerformSubstructureMatch: Callback to trigger substructure matching
+ *   - isLoadingHighlights: Whether highlights are being loaded
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Button, List, Typography, Divider, Empty, message, Select } from 'antd';
 import { SearchOutlined, EditOutlined, DeleteOutlined, SortAscendingOutlined } from '@ant-design/icons';

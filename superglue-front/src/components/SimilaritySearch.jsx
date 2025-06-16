@@ -1,3 +1,21 @@
+/**
+ * SimilaritySearch Component
+ *
+ * This component provides a modal dialog for performing molecular similarity searches.
+ * Users can select a similarity metric, run a search, and view results.
+ *
+ * Props:
+ *   - currentSmiles: The query SMILES string
+ *   - currentId: The query molecule ID
+ *   - filename: The source filename
+ *   - visible: Whether the modal is visible
+ *   - onClose: Callback to close the modal
+ *   - onResultsFound: Callback when results are found
+ *   - ketcher: Ketcher instance (optional)
+ *   - moleculeProperties: Properties of the molecule (optional)
+ *   - dataset_id: Dataset identifier (optional)
+ */
+
 import React, { useState } from 'react';
 import { Modal, Button, Tabs, Select, Table, Card, Space, Typography } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';

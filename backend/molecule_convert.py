@@ -4,6 +4,12 @@ from flask import request, jsonify
 
 
 def convert_molecule():
+    """
+    Convert a SMILES string to a mol block using RDKit and return as JSON response.
+    Expects JSON input: {"smiles": "..."}
+    Returns:
+        Response: Flask JSON response with mol_block or error message.
+    """
     data = request.json
     smiles = data.get('smiles')
 

@@ -1,11 +1,20 @@
+/**
+ * MyStructures Component
+ *
+ * This component displays a list of saved sub-structures (highlights/annotations) for molecules.
+ * Users can preview sub-structure SVGs and view annotation details.
+ *
+ * Features:
+ *   - Fetches sub-structures from the backend on mount
+ *   - Displays a table of sub-structures with annotation and SMARTS
+ *   - Allows SVG preview of highlighted sub-structures
+ */
+
 import React, { useEffect, useState } from "react";
 import { Table, Button, message, Modal } from "antd";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from '../api';
-/**
- * MyStructures ‑ list of saved sub‑structures.
- *
- */
+
 const MyStructures = () => {
   /* ----------------------------- state --------------------------------- */
   const [data,          setData]          = useState([]);   // table rows

@@ -1,3 +1,16 @@
+/**
+ * CsvPreview Component
+ *
+ * This component previews a CSV file containing molecular data, auto-detects ID and SMILES columns,
+ * and allows users to select and navigate to molecule details or editor pages.
+ *
+ * Features:
+ *   - Loads and parses CSV data from backend
+ *   - Auto-detects ID and SMILES columns
+ *   - Displays a table for preview and row selection
+ *   - Integrates with navigation to molecule editor and structure pages
+ */
+
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Papa from "papaparse";

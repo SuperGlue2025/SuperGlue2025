@@ -34,6 +34,9 @@ from admet_plot import make_density_plot
 
 # ────────────────────────────────────────────────────────────────────────────
 class NumpyEncoder(json.JSONEncoder):
+    """
+    Custom JSON encoder for handling numpy data types.
+    """
     def default(self, obj):
         if isinstance(obj, np.integer):  return int(obj)
         if isinstance(obj, np.floating): return float(obj)
@@ -75,10 +78,22 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "data")
 @app.route("/api/upload", methods=["POST"])
 # @jwt_required()
 def handle_upload():
+    """
+    Handle file upload via POST request.
+    Returns:
+        Response: The response from the upload_file function.
+    """
     return upload_file()
 
 @app.route("/data/<filename>")
 def serve_file(filename):
+    """
+    Serve a static file from the upload folder.
+    Args:
+        filename (str): The name of the file to serve.
+    Returns:
+        Response: The file as a Flask response.
+    """
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 # ----------------------------------------------------------------------------
@@ -87,6 +102,11 @@ def serve_file(filename):
 @app.route("/api/substructures", methods=["GET"])
 # @jwt_required()
 def list_substructures():
+    """
+    List all substructures for a given molecule_id (if provided).
+    Returns:
+        Response: JSON response with substructure data or error message.
+    """
     try:
         init_db()
         mol_id = request.args.get("molecule_id")
@@ -127,6 +147,11 @@ def list_substructures():
 # ----------------------------------------------------------------------------
 @app.route("/api/similarity_search", methods=["POST"])
 def handle_similarity_search():
+    """
+    Perform a similarity search for a given query SMILES and dataset.
+    Returns:
+        Response: JSON response with search results or error message.
+    """
     try:
         # get data from post
         request_data = request.get_json()
@@ -178,6 +203,11 @@ def handle_similarity_search():
 @app.route("/api/annotate_molecule", methods=["POST"])
 # @jwt_required()
 def handle_annotate_molecule():
+    """
+    Save a highlighted fragment and its annotation for a molecule.
+    Returns:
+        Response: JSON response indicating success or failure.
+    """
     try:
         request_data = request.get_json()
         print(f"Received data: {json.dumps(request_data, cls=NumpyEncoder)}")
@@ -249,11 +279,30 @@ def handle_annotate_molecule():
 
 
 @app.route("/api/convert_molecule",  methods=["POST"]) 
-def handle_convert_molecule():  return convert_molecule()
+def handle_convert_molecule(): 
+    """
+    Convert a molecule using the convert_molecule function.
+    Returns:
+        Response: The response from convert_molecule.
+    """
+    return convert_molecule()
 @app.route("/api/compounds",         methods=["GET"])       
-def handle_get_compounds():     return get_compounds()
+def handle_get_compounds():    
+    """
+    Get compounds using the get_compounds function.
+    Returns:
+        Response: The response from get_compounds.
+    """
+    return get_compounds()
 @app.route("/get_molecule_image/<cmpd_id>", methods=["GET"])
 def handle_visualize(cmpd_id):
+    """
+    Visualize a molecule by its compound ID and filename.
+    Args:
+        cmpd_id (str): The compound ID.
+    Returns:
+        Response: JSON response with visualization data or error message.
+    """
     try:
         filename = request.args.get("filename")
         if not filename:
@@ -265,7 +314,11 @@ def handle_visualize(cmpd_id):
 @app.route("/api/get_molecule_highlights", methods=["GET"])
 # @jwt_required()
 def handle_get_molecule_highlights():
-    """Retrieve all highlighted substructures for a specific molecule."""
+    """
+    Retrieve all highlighted substructures for a specific molecule.
+    Returns:
+        Response: JSON response with highlight data or error message.
+    """
     try:
         molecule_id = request.args.get('molecule_id') or request.args.get('id')
         dataset_id = request.args.get('dataset_id')
@@ -295,6 +348,15 @@ def handle_get_molecule_highlights():
         }), 500
 
 def get_fragment_mol(mol, atoms, bonds):
+    """
+    Create a fragment molecule from the given atoms and bonds.
+    Args:
+        mol (rdkit.Chem.Mol): The original molecule.
+        atoms (list): List of atom indices.
+        bonds (list): List of bond indices.
+    Returns:
+        rdkit.Chem.Mol: The fragment molecule.
+    """
     from rdkit import Chem
     em = Chem.EditableMol(Chem.Mol())
     atom_map = {}
@@ -316,7 +378,11 @@ def get_fragment_mol(mol, atoms, bonds):
 
 @app.route('/api/match_smarts', methods=['POST'])
 def handle_match_smarts():
-    """Match a SMARTS pattern against a molecule and return the matched atom indices"""
+    """
+    Match a SMARTS pattern against a molecule and return the matched atom indices.
+    Returns:
+        Response: JSON response with match results or error message.
+    """
     try:
         request_data = request.get_json()
         mol_smiles = request_data.get('smiles')
@@ -377,7 +443,11 @@ def handle_match_smarts():
 
 @app.route('/api/match_multiple_smarts', methods=['POST'])
 def handle_match_multiple_smarts():
-    """Match multiple SMARTS patterns against a molecule"""
+    """
+    Match multiple SMARTS patterns against a molecule.
+    Returns:
+        Response: JSON response with match results or error message.
+    """
     try:
         request_data = request.get_json()
         mol_smiles = request_data.get('smiles')
@@ -466,7 +536,11 @@ def handle_match_multiple_smarts():
 
 @app.route('/api/substructure_search', methods=['POST'])
 def substructure_search():
-    """Perform an exact substructure match search without saving results to the database."""
+    """
+    Perform an exact substructure match search without saving results to the database.
+    Returns:
+        Response: JSON response with search results or error message.
+    """
     try:
         # Get request parameters
         data = request.json
@@ -655,7 +729,11 @@ def substructure_search():
 
 @app.route('/api/get_molecule_svg', methods=['POST'])
 def get_molecule_svg():
-    """Generate a molecule SVG with precise substructure highlights."""
+    """
+    Generate a molecule SVG with precise substructure highlights.
+    Returns:
+        Response: JSON response with SVG data or error message.
+    """
     try:
         data = request.json
         smiles = data.get('smiles')
@@ -818,7 +896,13 @@ def get_molecule_svg():
         return jsonify({"success": False, "error": f"Failed to generate molecule SVG: {str(e)}"}), 500
 
 def fix_smarts_pattern(smarts):
-    """Fix a SMARTS pattern to make it more reliable."""
+    """
+    Fix a SMARTS pattern to make it more reliable.
+    Args:
+        smarts (str): The SMARTS pattern to fix.
+    Returns:
+        str: The fixed SMARTS pattern.
+    """
     if not smarts:
         return "[#6]"  # Match any carbon atom if empty
 
@@ -846,6 +930,11 @@ def fix_smarts_pattern(smarts):
 
 @app.route('/api/optimize_structure', methods=['POST'])
 def optimize_structure():
+    """
+    Optimize the 3D structure of a molecule using either SMILES or molfile input.
+    Returns:
+        Response: JSON response with optimized structure or error message.
+    """
     try:
         data = request.json
         molfile = data.get('molfile')
@@ -983,7 +1072,13 @@ def optimize_structure():
         }), 500
 @app.route('/api/get_molecule_structure/<molecule_id>', methods=['GET'])
 def get_molecule_structure_api(molecule_id):
-    """API endpoint: Retrieve molecule structure"""
+    """
+    API endpoint: Retrieve molecule structure by molecule_id.
+    Args:
+        molecule_id (str): The molecule ID.
+    Returns:
+        Response: JSON response with structure data or error message.
+    """
     try:
         # Import the function to retrieve structure from the database
         from substructure_annotate import get_molecule_structure
@@ -1014,6 +1109,11 @@ def get_molecule_structure_api(molecule_id):
 
 @app.route('/api/compound_info')
 def get_compound_info():
+    """
+    Retrieve compound information by molecule_id and filename.
+    Returns:
+        Response: JSON response with compound info or error message.
+    """
     molecule_id = request.args.get('molecule_id')
     filename = request.args.get('filename')
     DB_PATH = 'data/molecular_annotate.db'  # Adjust the path as needed
@@ -1040,6 +1140,11 @@ def get_compound_info():
 
 @app.route('/api/predict_admet', methods=['POST'])
 def handle_predict_admet():
+    """
+    Predict ADMET properties for a list of SMILES strings.
+    Returns:
+        Response: JSON response with prediction results or error message.
+    """
     try:
         data = request.get_json()
         smiles = data.get('smiles')

@@ -1,3 +1,10 @@
+/**
+ * AdmetResult Component
+ * 
+ * This component displays the predicted ADMET properties for a given set of SMILES strings.
+ * It groups the properties into categories and allows users to view distribution plots for each property.
+ */
+
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api.js'; 
@@ -67,26 +74,26 @@ const AdmetResult = () => {
   const navigate = useNavigate();
   const { smiles, predictions, allSmiles } = state || {};
   
-  console.log('Received state:', state); // 调试日志
-  console.log('All SMILES:', allSmiles); // 调试日志
-  console.log('Predictions:', predictions); // 调试日志
+  console.log('Received state:', state); // Debug log
+  console.log('All SMILES:', allSmiles); // Debug log
+  console.log('Predictions:', predictions); // Debug log
   
-  // 使用所有化合物的预测结果
+  // Use predictions for all compounds
   const data = Array.isArray(predictions) ? predictions : [predictions];
-  console.log('Processed data:', data); // 调试日志
+  console.log('Processed data:', data); // Debug log
 
   // 1) Grouping, skipping any percentile keys
   const grouped = {};
-  // 遍历所有化合物的预测结果
+  // Iterate over predictions for all compounds
   data.forEach(compoundData => {
-    if (!compoundData) return; // 跳过空数据
+    if (!compoundData) return; // Skip empty data
     Object.entries(compoundData).forEach(([k, v]) => {
       if (R_PCTL.test(k)) return;             // skip drugbank percentiles
       const g = getGroup(k);
       if (!grouped[g]) {
         grouped[g] = [];
       }
-      // 检查是否已存在相同的属性
+      // Check if the property already exists
       const existingIndex = grouped[g].findIndex(item => item.k === k);
       if (existingIndex === -1) {
         grouped[g].push({ k, v });
@@ -105,7 +112,7 @@ const AdmetResult = () => {
     try {
       setLoading(true);
       
-      // 使用所有化合物的SMILES
+      // Use all compound SMILES
       const smilesList = Array.isArray(allSmiles) ? allSmiles : (Array.isArray(smiles) ? smiles : [smiles]);
       console.log('Sending SMILES list for plot:', smilesList);
       

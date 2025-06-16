@@ -1,3 +1,13 @@
+/**
+ * MoleculeIndex Component
+ *
+ * This is the main chemical structure editor and analysis component.
+ * It provides molecule drawing, annotation, substructure highlighting, similarity search,
+ * ADMET property prediction, and CSV/SMILES data management for chemical informatics workflows.
+ * The component integrates Ketcher for molecule editing and supports interactive filtering,
+ * property display, and result export.
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, message, Tabs, Layout, Menu, Card, List, Typography, Table, Space, Divider, Empty } from 'antd';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -239,13 +249,13 @@ const MoleculeIndex = () => {
       return;
     }
     try {
-      // 如果是从CSV文件加载的多个SMILES
+      // If loading multiple SMILES from a CSV file
       if (smilesFromCSV && Array.isArray(smilesFromCSV)) {
         console.log('Using SMILES from CSV:', smilesFromCSV);
         return smilesFromCSV;
       }
       
-      // 否则从Ketcher获取单个SMILES
+      // Otherwise, get a single SMILES from Ketcher
       const smiles = await ketcher.getSmiles();
       setKetcherSmiles(smiles);
       setCurrentSmiles(smiles);
@@ -263,7 +273,7 @@ const MoleculeIndex = () => {
   
     try {
       const datasetId = location.state?.dataset_id;
-      // 如果molId带有前缀，去掉前缀后再请求
+      // If molId has a prefix, remove the prefix before requesting
       let molIdToUse = molId;
       molIdToUse = String(molIdToUse || '');
       if (molIdToUse.startsWith('cmpd_') || molIdToUse.startsWith('Compound-')) {
@@ -373,10 +383,10 @@ const MoleculeIndex = () => {
     if (!smiles) return;
   
     try {
-      // 确保smiles是数组
+      // Ensure smiles is an array
       const smilesList = Array.isArray(smiles) ? smiles : [smiles];
       
-      // 从CSV文件中获取所有化合物的SMILES
+      // Get all compound SMILES from the CSV file
       let allSmiles = smilesList;
       if (location.state?.fileUrl) {
         try {

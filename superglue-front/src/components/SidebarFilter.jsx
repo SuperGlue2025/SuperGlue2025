@@ -1,3 +1,18 @@
+/**
+ * SidebarFilter Component
+ *
+ * This component provides a dynamic filter sidebar for chemical search results.
+ * Users can enable/disable filters, adjust property ranges, and apply or clear filters.
+ *
+ * Props:
+ *   - isVisible: Whether the sidebar is visible
+ *   - searchResults: Array of search result objects
+ *   - onApplyFilters: Callback when filters are applied
+ *   - onClearFilters: Callback when filters are cleared
+ *   - currentSmiles: The current query SMILES string
+ *   - isLoading: Whether the filter is in a loading state
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Card, Slider, Checkbox, Collapse, Typography, InputNumber, Button, Row, Col, Divider } from 'antd';
 import { FilterOutlined, SearchOutlined } from '@ant-design/icons';
