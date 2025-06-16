@@ -162,6 +162,14 @@ This is especially useful for chemists, developers, or collaborators looking to 
 
 ---
 
+## 🛠️ Future Work
+
+Super-Glue is an evolving tool with planned enhancements including multi-user collaboration, export features, and improved performance.
+
+👉 [View Planned Features and Future Work](docs/future_work.md)
+
+---
+
 ## 👥 Contributors
 
 - Haoyu He
