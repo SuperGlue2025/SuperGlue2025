@@ -30,7 +30,7 @@ Super-Glue accepts two types of input:
 
 #### Parsing
 
-- Uploaded CSV/SDF files are parsed and linked by a shared compound ID and dataset ID.
+- Uploaded `.csv` files are parsed and linked by a shared compound ID and dataset ID.
 
 #### Storage
 
