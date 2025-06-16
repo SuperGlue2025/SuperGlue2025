@@ -213,7 +213,7 @@ Super-Glue enables users to find molecules that are structurally similar to a se
 
 ## 3D Visualization
 
-SuperGlue supports interactive 3D rendering of molecules using **3Dmol.js**. This feature helps chemists inspect spatial structure and geometry.
+Super-Glue supports interactive 3D rendering of molecules using **3Dmol.js**. This feature helps chemists inspect spatial structure and geometry.
 
 ### How it Works
 
@@ -230,7 +230,7 @@ SuperGlue supports interactive 3D rendering of molecules using **3Dmol.js**. Thi
 
 ## ADMET Property Prediction
 
-SuperGlue integrates **ADMET-ai**, an open-source machine learning platform trained on datasets from the **Therapeutics Data Commons**, to predict drug-like properties.
+Super-Glue integrates **ADMET-ai**, an open-source machine learning platform trained on datasets from the **Therapeutics Data Commons**, to predict drug-like properties.
 
 ### How it Works
 
