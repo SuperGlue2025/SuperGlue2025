@@ -282,7 +282,7 @@ Super-Glue uses a relational SQL database to manage uploaded molecules, annotati
 
 #### `sdf`
 
-- Stores user-uploaded 3D structures (e.g., .sdf files) as **TEXT**
+- Stores user-uploaded 3D structures (e.g., `.sdf` files) as **`TEXT`**
 - Allows molecules to be rendered in 3D (via `3Dmol.js`)
 - Each record is tied to a specific molecule and dataset
 
