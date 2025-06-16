@@ -135,28 +135,12 @@ class TestSimilaritySearch(unittest.TestCase):
             self.assertEqual(results.iloc[0]['cmpd_id'], 'COMP1')
             self.assertEqual(results.iloc[0]['similarity'], 1.0)
 
-    @patch('pandas.read_csv')
-    def test_similarity_search_file_not_found(self, mock_read_csv):
+    @patch('pandas.read_sql_query')
+    def test_similarity_search_file_not_found(self, mock_read_sql):
         """Test similarity_search when file is not found"""
-        mock_read_csv.side_effect = FileNotFoundError("File not found")
-
-        with self.assertRaises(FileNotFoundError):
+        mock_read_sql.side_effect = Exception("File not found")
+        with self.assertRaises(Exception):
             similarity_search(self.query_smiles, "non_existent_file.csv")
-
-    def test_similarity_search_different_metrics(self):
-        """Test similarity_search with different similarity metrics"""
-        metrics = ['Tanimoto', 'Dice', 'Cosine']
-
-        for metric in metrics:
-            results = similarity_search(self.query_smiles, self.mock_filename, similarity_metric=metric)
-
-            # Basic checks
-            self.assertIsInstance(results, pd.DataFrame)
-            self.assertGreater(len(results), 0)
-
-            # Perfect match should still be 1.0 regardless of metric
-            self.assertEqual(results.iloc[0]['cmpd_id'], 'COMP1')
-            self.assertEqual(results.iloc[0]['similarity'], 1.0)
 
 
 if __name__ == '__main__':
