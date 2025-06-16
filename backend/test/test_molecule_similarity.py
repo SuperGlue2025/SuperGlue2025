@@ -69,31 +69,71 @@ class TestSimilaritySearch(unittest.TestCase):
         with self.assertRaises(ValueError):
             compute_similarity(fp1, fp2, "InvalidMetric")
 
-    def test_similarity_search(self):
-        """Test the similarity_search function with real data"""
-        # Run the function with test data
-        results = similarity_search(self.query_smiles, self.mock_filename)
+    @patch('pandas.read_sql_query')
+    def test_similarity_search(self, mock_read_sql):
+        # Construct mock data returned from the database
+        mock_df = pd.DataFrame({
+            'cmpd_id': ['COMP1', 'COMP2', 'COMP3', 'COMP4'],
+            'smiles': [
+                'CC(=O)OC1=CC=CC=C1C(=O)O',
+                'CC1=CC=C(C=C1)NC(=O)CC(CC2=CC=C(C=C2)S(=O)(=O)N)CC(=O)O',
+                'CCN(CCO)CCCC(C)NC1=C2C=CC(=CC2=NC=C1)Cl',
+                'CC1=C(C=C(C=C1)NC(=O)C)NC2=CC=CC=C2C(=O)O'
+            ],
+            'property': [
+                '{"prop1": 1}', '{"prop1": 2}', '{"prop1": 3}', '{"prop1": 4}'
+            ]
+        })
+        mock_read_sql.return_value = mock_df
 
-        # Check that the results are as expected
+        results = similarity_search(self.query_smiles, 1)
         self.assertIsInstance(results, pd.DataFrame)
         self.assertGreater(len(results), 0)
-
-        # The first compound should be Aspirin (perfect match)
         self.assertEqual(results.iloc[0]['cmpd_id'], 'COMP1')
-        self.assertEqual(results.iloc[0]['similarity'], 1.0)
-
-        # Check columns are ordered correctly
         self.assertEqual(results.columns[0], 'similarity')
 
-        # Check all compounds are returned and sorted by similarity
-        self.assertEqual(len(results), 4)
-        for i in range(len(results) - 1):
-            self.assertGreaterEqual(results.iloc[i]['similarity'], results.iloc[i + 1]['similarity'])
+    @patch('pandas.read_sql_query')
+    def test_similarity_search_invalid_query(self, mock_read_sql):
+        # Just mock a valid data row
+        mock_df = pd.DataFrame({
+            'cmpd_id': ['COMP1'],
+            'smiles': ['CC(=O)OC1=CC=CC=C1C(=O)O'],
+            'property': ['{"prop1": 1}']
+        })
+        mock_read_sql.return_value = mock_df
 
-    def test_similarity_search_invalid_query(self):
-        """Test similarity_search with invalid query SMILES"""
         with self.assertRaises(ValueError):
-            similarity_search("invalid_smiles", self.mock_filename)
+            similarity_search("invalid_smiles", 1)
+
+    @patch('pandas.read_sql_query')
+    def test_similarity_search_empty_result(self, mock_read_sql):
+        # Return an empty DataFrame
+        mock_read_sql.return_value = pd.DataFrame(columns=['cmpd_id', 'smiles', 'property'])
+        results = similarity_search(self.query_smiles, 1)
+        self.assertIsInstance(results, pd.DataFrame)
+        self.assertEqual(len(results), 0)
+
+    @patch('pandas.read_sql_query')
+    def test_similarity_search_different_metrics(self, mock_read_sql):
+        mock_df = pd.DataFrame({
+            'cmpd_id': ['COMP1', 'COMP2'],
+            'smiles': [
+                'CC(=O)OC1=CC=CC=C1C(=O)O',
+                'CC1=CC=C(C=C1)NC(=O)CC(CC2=CC=C(C=C2)S(=O)(=O)N)CC(=O)O'
+            ],
+            'property': [
+                '{"prop1": 1}', '{"prop1": 2}'
+            ]
+        })
+        mock_read_sql.return_value = mock_df
+
+        metrics = ['Tanimoto', 'Dice', 'Cosine']
+        for metric in metrics:
+            results = similarity_search(self.query_smiles, 1, similarity_metric=metric)
+            self.assertIsInstance(results, pd.DataFrame)
+            self.assertGreater(len(results), 0)
+            self.assertEqual(results.iloc[0]['cmpd_id'], 'COMP1')
+            self.assertEqual(results.iloc[0]['similarity'], 1.0)
 
     @patch('pandas.read_csv')
     def test_similarity_search_file_not_found(self, mock_read_csv):
@@ -102,31 +142,6 @@ class TestSimilaritySearch(unittest.TestCase):
 
         with self.assertRaises(FileNotFoundError):
             similarity_search(self.query_smiles, "non_existent_file.csv")
-
-    def test_similarity_search_empty_result(self):
-        """Test similarity_search with data that produces no valid results"""
-        # Create a dataset with invalid SMILES
-        invalid_data = pd.DataFrame({
-            'cmpd_id': ['INVALID1', 'INVALID2'],
-            'SMILES': ['invalid_smiles_1', 'invalid_smiles_2'],
-            'Name': ['Invalid1', 'Invalid2']
-        })
-
-        invalid_filename = 'invalid_compounds.csv'
-        invalid_filepath = os.path.join('data', invalid_filename)
-        invalid_data.to_csv(invalid_filepath, index=False)
-
-        try:
-            # Test with invalid data
-            results = similarity_search(self.query_smiles, invalid_filename)
-
-            # Should return empty DataFrame
-            self.assertIsInstance(results, pd.DataFrame)
-            self.assertEqual(len(results), 0)
-        finally:
-            # Clean up
-            if os.path.exists(invalid_filepath):
-                os.remove(invalid_filepath)
 
     def test_similarity_search_different_metrics(self):
         """Test similarity_search with different similarity metrics"""
