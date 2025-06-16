@@ -155,7 +155,7 @@ Covers uploading files, annotating molecules, running predictions, and more.
 
 ## 🔬 Pipeline Logic
 
-Want to understand how SuperGlue works under the hood?
+Want to understand how Super-Glue works under the hood?
 
 The [Pipeline Documentation](docs/pipeline.md) explains the backend logic powering molecular annotation, similarity search, ADMET prediction, and database structure.  
 This is especially useful for chemists, developers, or collaborators looking to extend the platform or understand how molecular data is processed and stored.
