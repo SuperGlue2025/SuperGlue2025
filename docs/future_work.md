@@ -4,26 +4,20 @@ As the project transitions to the stakeholder company, here are recommended futu
 
 ## ✅ Priority Fixes & Incomplete Features
 
-- **Similarity Search Errors**  
-  **Issue**: If multiple users are logged in and share the same backend session, similarity search may throw errors.
+- **Fix similarity search "View" preview behavior**  
+Viewing a compound from similarity search loads it into Ketcher but desynchronizes it from the right panel and other functions (e.g. properties, highlights, substructure match). Fix by either previewing SVG in a separate viewer or using hover previews.
 
-  **Temporary Fix**: Return to the homepage and re-upload the dataset to reset your session state.
+- **Fix multi-user dataset access conflicts**  
+When a user opens a dataset uploaded by a different account, similarity search and other backend functions may fail. Add user-level dataset scoping or ownership checks to prevent errors.
 
-- **Preview Molecule Misalignment**  
-  **Current Behavior**: Clicking the "**View**" button in similarity search results sends the selected molecule to **Ketcher** for preview.
-
-  **Issue**: The molecule stays in Ketcher after switching tabs (e.g. to Properties or Highlights), which causes a mismatch between the displayed molecule and the right-side info.
-  - This also affects **View Highlights**, as it incorrectly references atom indices from the previewed molecule.
-
-  **Temporary Fix**: Return to the summary page and re-select the molecule.  
-  **Planned Fixes**:
-  - Show preview in a **separate preview box**, not in **Ketcher**.
-  - Or enable **hover-to-preview** via SVG rendering for a more isolated and accurate display.
 - **Enable annotation editing/deletion**  
   Currently, icons are present but not functional.
-  
-- **Fix similarity search preview**  
-  "View" button in similarity results should display the compound preview.
+
+- **Highlight the current compound on ADMET distribution plots**  
+  Previously shown as a red vertical marker; should be restored to help users locate the selected molecule's property within the distribution.
+
+- **Add back button or smoother navigation from filter modal**  
+The full-screen filter view in similarity search lacks a back button. Currently, users must use the browser back button, but returns them to the summary page.
 
 - **Improve layout rendering**  
   Some elements shift outside the page on zoom/rescale; layout needs to be more responsive.
@@ -38,7 +32,7 @@ As the project transitions to the stakeholder company, here are recommended futu
   Some button names or labels can be improved for clarity.
 
 - **Switch to composite database key**  
-  Improve indexing by using (molecule_id, dataset_id) or similar composite keys.
+  Improve indexing by using (`molecule_id`, `dataset_id`) or similar composite keys.
 
 - **Schema naming cleanup**  
   Rename fields like `molecule_id` → `cmpd_id` for clarity and consistency.
