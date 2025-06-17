@@ -188,17 +188,28 @@ The Annotation Page is where most of your work happens. Here, you can visualize,
 
 ## 🛠️ **Troubleshooting**
 
-| Problem | Solution |
-|---------|----------|
-| Molecules not displaying | Ketcher instance may fail to load. Refresh the page. |
-| Page not showing correctly | Adjust your browser zoom level. |
-| Table content not showing correctly | Try scrolling horizontally or adjust your browser zoom level. |
-| No way back? | Use the browser's back button |
-| Highlight doesn't save | Check if you clicked "Capture Selection"; Make sure not to use Ketcher highlight function. Use Ketcher select tool instead. |
-| Similarity search throws an error when running the function. | This may happen when multiple users share the same backend state. Go back to the homepage and re-upload the dataset to reset the session. |
-| "View" button in similarity search results causes incorrect behavior — the molecule previewed in Ketcher is not synced with the properties on the right, and related functions like View Highlights or Substructure Matching may break or show errors. | This happens because the molecule stays loaded in Ketcher but does not update backend references. To fix: go to the Summary Page and reselect the correct compound from the table. Avoid using other features before reselecting. |
-| Substructure matching not working | Try a more general highlight or ensure the substructure is valid. |
-| Long loading times | Large datasets may take longer. |
+| Problem | Suggested Solution |
+|--------|---------------------|
+| **General Issues** | |
+| Table content not showing or overflowing | Adjust your browser zoom or scroll horizontally. |
+| Full-screen pages has no back button | Use the browser’s back button to return to the previous page. A future fix will add an in-app back button. |
+| Long loading or slow interactions | Large datasets or ADMET calculations may take time. Wait or reduce dataset size. |
+| **Login Issues** | |
+| Captcha fails to load | This may happen if backend services are down. Make sure the backend is running. |
+| Unexpected log out | This will happen if you try to refresh the page while logged in. |
+| **Annotate / Highlight and Substructure Match** | |
+| Highlights not saving | Ensure you're using the **Ketcher select tool**, then click **Capture Selection** before saving. Don’t use Ketcher’s built-in highlight tool — it doesn’t persist. |
+| Highlights not showing on Ketcher when selected from table | If you only select one atom, the highlight will be saved but not rendered in Ketcher. Select at least one atome and one bond to see the highlight. Select at least two atoms and one bond to use the substructure matching tool. |
+| Selected highlight remains active | When a highlight is selected, it stays rendered in Ketcher until you select another one, even if you switch tools. It does not affect other functions. If you want to clear it, use Ketcher's built-in highlight tool (select and right click) to remove it. |
+| Cannot edit or delete highlights | Currently, highlights cannot be edited or deleted. This feature is planned for a future update. |
+| Highlight showing different structure in Ketcher and error in substructure matching | This is likely because you viewed one of the similarity search results in Ketcher, which desynchronizes the backend. Go back to the Summary Page and reselect the compound to restore backend linkage. Avoid using other functions before doing this. |
+| Substructure matching showing no results | Try a broader or valid highlight (must contain at least two atoms and a bond). Invalid selections won’t match correctly. |
+| **Similarity Search** | |
+| Similarity search throws an error | This may happen if you're using a dataset uploaded by another account. Go to the Homepage and re-upload the dataset under your current user to reset session state. |
+| Blank filter modal before search | This function is not yet implemented. The filter modal will be available in a future update. |
+| "View" button in similarity results causes desync (e.g., properties don’t match or substructure matching fails) | Clicking **View** loads the molecule into Ketcher, but doesn't sync the backend. Fix: Go to the Summary Page and reselect the compound to restore backend linkage. Avoid using other functions before doing this. |
+| **ADMET Properties** | |
+| ADMET distribution chart doesn’t show selected molecule | The red marker for the current molecule is missing. A future update will restore it for easier interpretation. |
 
 ## 📬 **Feedback and Support**
 
