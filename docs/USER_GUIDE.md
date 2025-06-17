@@ -6,16 +6,18 @@ Welcome to **Super-Glue** — a web-based platform for molecular visualization, 
 
 1. [Getting Started](#-getting-started)
 2. [Homepage](#-homepage)
+    - [Login (Required)](#-login-required)
     - [Upload Dataset](#-upload-dataset)
     - [Select Recent Dataset](#-select-recent-dataset)
 3. [Summary Page](#-summary-page)
     - [Compound Table](#-compound-table)
     - [My Structures](#️-my-structures)
 4. [Annotation Page](#️-annotation-page)
+    - [Property Table](#-property-table)
     - [Highlights and Text Annotations](#-highlights-and--text-annotations)
     - [Substructure Matching](#-substructure-matching)
     - [Similarity Search](#-similarity-search)
-    - [ADMET Property Calculation](#-admet-property-calculation)
+    - [ADMET Property Prediction](#-admet-property-prediction)
     - [3D Visualization](#-3d-visualization)
     - [Export *(Planned)*](#-export-planned)
 5. [Troubleshooting](#️-troubleshooting)
@@ -109,7 +111,7 @@ The Annotation Page is where most of your work happens. Here, you can visualize,
   3. Click **Capture** to capture the selection.
   4. Optional: Add a comment in the text box to describe the highlight.
   5. Click **Save Annotation** to save your highlight. *Note: Please do not use the Ketcher highlight function to highlight because it will not save the highlight.*
-  6. View all saved highlights by clicking "**View Highlights**" on the left sidebar. *Note: For now this is a separate tab, but in the future they will be integrated into one for easier access.*
+  6. View all saved highlights by clicking **View Highlights** on the left sidebar. *Note: For now this is a separate tab, but in the future they will be integrated into one for easier access.*
   7. All highlights associated with the compound will be displayed in a table. Select a highlight to view it on Ketcher. *Note: Text displayed in the table is the comment you added when saving the highlight. If you did not add a comment, it will display system-generated highlight_id with italic text.*
 
 > ⚠️ Note: Currently, saved highlights and annotations cannot be edited or deleted. This feature is planned for a future update.
@@ -145,7 +147,7 @@ The Annotation Page is where most of your work happens. Here, you can visualize,
 ![Similarity Search Results Example](images/similarity_search_results.png)
 ![Similarity Search Filter Example](images/similarity_search_filter.png)
 
-### 🧮 ADMET Property Calculation
+### 🧮 ADMET Property Prediction
 
 - Super-Glue uses machine learning to predict key drug-like properties (e.g., permeability, toxicity) based on the molecule’s SMILES string.
 - We use the **ADMET** package — which stands for **Absorption**, **Distribution**, **Metabolism**, **Excretion**, and **Toxicity**.
