@@ -652,35 +652,47 @@ const MoleculeIndex = () => {
       const atoms = highlight.atoms || [];
       let bonds = highlight.bonds || [];
 
-      // If we have atoms but no bonds, try to infer the bonds from the current molecule structure
-      if (atoms.length > 0 && bonds.length === 0) {
-
-        const molecule = ketcher.editor.render.ctab.molecule;
-
-        // Loop through all bonds in the molecule and check if both ends are in our highlighted atoms
-        if (molecule && molecule.bonds) {
-          bonds = molecule.bonds
-            .map((bond, index) => ({
-              index,
-              begin: bond.begin,
-              end: bond.end
-            }))
-            .filter(bond =>
-              atoms.includes(bond.begin) && atoms.includes(bond.end)
-            )
-            .map(bond => bond.index);
-        }
-      }
-
       // Clear previous highlights
       ketcher.editor.highlights.clear();
 
-      // Apply the highlight with both atoms and calculated bonds
-      ketcher.editor.highlights.create({
-        atoms: atoms,
-        bonds: bonds,
-        color: '#FF0000' // Red highlight
-      });
+      // Special handling for single atom highlight
+      if (atoms.length === 1) {
+        // For single atom, we need to ensure the atom is properly highlighted
+        const atomId = atoms[0];
+        ketcher.editor.highlights.create({
+          atoms: [atomId],
+          color: '#FF0000',
+          type: 'atom'  // Explicitly specify this is an atom highlight
+        });
+      } else {
+        // For multiple atoms, we need to calculate connecting bonds
+        if (atoms.length > 0 && bonds.length === 0) {
+          const molecule = ketcher.editor.render.ctab.molecule;
+          if (molecule && molecule.bonds) {
+            bonds = molecule.bonds
+              .map((bond, index) => ({
+                index,
+                begin: bond.begin,
+                end: bond.end
+              }))
+              .filter(bond =>
+                atoms.includes(bond.begin) && atoms.includes(bond.end)
+              )
+              .map(bond => bond.index);
+          }
+        }
+
+        // Create highlight for multiple atoms
+        ketcher.editor.highlights.create({
+          atoms: atoms,
+          bonds: bonds,
+          color: '#FF0000',
+          type: 'substructure'  // Explicitly specify this is a substructure highlight
+        });
+      }
+
+      // Force redraw to ensure highlight is visible
+      ketcher.editor.render.update();
     } catch (error) {
       console.error('apply highlight error:', error);
     }
@@ -890,8 +902,45 @@ const generateSubstructureColumns = (results) => {
       }
     ];
   }
-  
-  // If there are results, return the full column definition
+
+  // Dynamically add property fields
+  const baseFields = [
+    'id', 'cmpd_id', 'smiles', 'fragment_smarts', 'fragment_smiles',
+    'match_atoms', 'match_bonds', 'key', 'Actions'
+  ];
+  // Get all fields from the first result
+  const allKeys = Object.keys(results[0] || {});
+  // Filter out property fields
+  const propertyKeys = allKeys.filter(
+    key => !baseFields.includes(key.toLowerCase())
+  );
+
+  // Generate property columns
+  const propertyColumns = propertyKeys.map(key => {
+    // Check if the value is numeric
+    const sampleValue = results[0][key];
+    const isNumeric = typeof sampleValue === 'number' || (typeof sampleValue === 'string' && !isNaN(parseFloat(sampleValue)));
+    return {
+      title: key,
+      dataIndex: key,
+      key: key,
+      sorter: isNumeric ? (a, b) => {
+        const aVal = typeof a[key] === 'number' ? a[key] : parseFloat(a[key]);
+        const bVal = typeof b[key] === 'number' ? b[key] : parseFloat(b[key]);
+        return aVal - bVal;
+      } : undefined,
+      render: value => {
+        if (value === null || value === undefined) return '-';
+        if (isNumeric) {
+          return typeof value === 'number' ? value.toFixed(2) : parseFloat(value).toFixed(2);
+        }
+        return value;
+      },
+      ellipsis: true,
+    };
+  });
+
+  // Combine all columns
   return [
     {
       title: 'Cmpd Id',
@@ -909,6 +958,7 @@ const generateSubstructureColumns = (results) => {
         </div>
       )
     },
+    ...propertyColumns,
     {
       title: 'Actions',
       key: 'actions',
@@ -1174,15 +1224,16 @@ const generateSubstructureColumns = (results) => {
             <Menu.Item key="annotate" icon={<CommentOutlined />} onClick={() => handleSidebarAction('annotate')}>
               Annotate
             </Menu.Item>
+            <Menu.Item key="export" icon={<HighlightOutlined />} onClick={() => handleSidebarAction('export')}>
+              View Highlights
+            </Menu.Item>
             <Menu.Item key="similarity" icon={<FileSearchOutlined />} onClick={() => handleSidebarAction('similarity')}>
               Similarity Search
             </Menu.Item>
             <Menu.Item key="Properties" icon={<CalculatorOutlined />} onClick={() => handleSidebarAction('compute')}>
               Properties
             </Menu.Item>
-            <Menu.Item key="export" icon={<HighlightOutlined />} onClick={() => handleSidebarAction('export')}>
-              View Highlights
-            </Menu.Item>
+            
 
             <Menu.Item key="modify" icon={<ClusterOutlined />} onClick={() => handleSidebarAction('modify')}>
               3D Visualization
